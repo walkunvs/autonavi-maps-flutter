@@ -1,0 +1,32 @@
+name: autonavi_maps_flutter
+description: >-
+  A Flutter plugin for AutoNavi (高德地图) Maps on Android and iOS.
+  Provides map rendering, camera control, and map overlays.
+version: 0.1.0
+homepage: https://github.com/walkunvs/autonavi-maps-flutter
+repository: https://github.com/walkunvs/autonavi-maps-flutter
+issue_tracker: https://github.com/walkunvs/autonavi-maps-flutter/issues
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+  flutter: ">=3.10.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+  mockito: ^5.4.0
+  build_runner: ^2.4.0
+
+flutter:
+  plugin:
+    platforms:
+      android:
+        package: com.autonavi.maps.flutter
+        pluginClass: AutonaviMapsFlutterPlugin
+      ios:
+        pluginClass: AutonaviMapsFlutterPlugin

@@ -1,0 +1,41 @@
+name: autonavi_maps_flutter
+repository: https://github.com/walkunvs/autonavi-maps-flutter
+
+packages:
+  - packages/**
+  - example
+
+command:
+  version:
+    independentVersioning: true
+
+scripts:
+  analyze:
+    run: melos exec -- flutter analyze
+    description: Analyze all packages
+
+  test:
+    run: melos exec -- flutter test
+    description: Run tests in all packages
+
+  format:
+    run: melos exec -- dart format .
+    description: Format all packages
+
+  pub_get:
+    run: melos exec -- flutter pub get
+    description: flutter pub get in all packages
+
+  build_example_android:
+    run: flutter build apk --debug
+    description: Build example Android APK
+    packageFilters:
+      dirExists: android
+    select-package:
+      scope: example
+
+  build_example_ios:
+    run: flutter build ios --debug --no-codesign
+    description: Build example iOS
+    select-package:
+      scope: example

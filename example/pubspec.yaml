@@ -1,0 +1,26 @@
+name: autonavi_maps_flutter_example
+description: Demonstrates autonavi_maps_flutter, autonavi_location_flutter, and autonavi_search_flutter packages.
+publish_to: 'none'
+version: 0.1.0
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+  flutter: ">=3.10.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  autonavi_maps_flutter:
+    path: ../packages/autonavi_maps_flutter
+  autonavi_location_flutter:
+    path: ../packages/autonavi_location_flutter
+  autonavi_search_flutter:
+    path: ../packages/autonavi_search_flutter
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true

@@ -1,0 +1,45 @@
+name: Publish to pub.dev
+
+on:
+  push:
+    tags:
+      - '*/v*'   # matches: autonavi_maps_flutter/v0.1.0
+
+jobs:
+  publish:
+    name: Publish package
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write  # Required for pub.dev OIDC authentication
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.22.x'
+          channel: 'stable'
+
+      - uses: dart-lang/setup-dart@v1
+
+      - name: Install Melos
+        run: dart pub global activate melos
+
+      - name: Bootstrap
+        run: melos bootstrap
+
+      - name: Determine package from tag
+        id: pkg
+        run: |
+          TAG="${{ github.ref_name }}"
+          PKG="${TAG%/v*}"
+          echo "package=$PKG" >> "$GITHUB_OUTPUT"
+          echo "Publishing package: $PKG"
+
+      - name: Dry run publish
+        run: dart pub publish --dry-run
+        working-directory: packages/${{ steps.pkg.outputs.package }}
+
+      - name: Publish to pub.dev
+        run: dart pub publish --force
+        working-directory: packages/${{ steps.pkg.outputs.package }}
