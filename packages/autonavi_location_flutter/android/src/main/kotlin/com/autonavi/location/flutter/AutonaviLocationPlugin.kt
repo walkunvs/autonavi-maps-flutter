@@ -58,9 +58,11 @@ class AutonaviLocationPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
             "location#getOnce" -> {
                 @Suppress("UNCHECKED_CAST")
                 val options = call.arguments as? Map<String, Any> ?: emptyMap()
-                LocationStreamHandler(ctx).getOnce(options) { locationResult ->
-                    result.success(locationResult)
-                }
+                LocationStreamHandler(ctx).getOnce(
+                    options,
+                    onSuccess = { result.success(it) },
+                    onError = { code, msg -> result.error(code, msg, null) },
+                )
             }
             "location#updateOptions" -> {
                 @Suppress("UNCHECKED_CAST")

@@ -11,6 +11,7 @@ class AMapController: NSObject, FlutterPlatformView, MAMapViewDelegate {
     private var polygons: [String: MAPolygon] = [:]
     private var circles: [String: MACircle] = [:]
     private var markerAnnotationViews: [String: MAAnnotationView] = [:]
+    private var markerIdByAnnotation: [ObjectIdentifier: String] = [:]
 
     init(
         frame: CGRect,
@@ -132,8 +133,8 @@ class AMapController: NSObject, FlutterPlatformView, MAMapViewDelegate {
 
         case "markers#isInfoWindowShown":
             let markerId = (args as? [String: Any])?["markerId"] as? String
-            let isShown = markerId.flatMap { markers[$0] }.map {
-                mapView.selectedAnnotations.contains { $0 as AnyObject === $0 as AnyObject }
+            let isShown = markerId.flatMap { markers[$0] }.map { annotation in
+                mapView.selectedAnnotations.contains { $0 === annotation }
             } ?? false
             result(isShown)
 
@@ -182,8 +183,10 @@ class AMapController: NSObject, FlutterPlatformView, MAMapViewDelegate {
     }
 
     func mapView(_ mapView: MAMapView!, didSelect view: MAAnnotationView!) {
-        if let title = view.annotation?.title {
-            channel.invokeMethod("marker#onTap", arguments: ["markerId": title as Any])
+        guard let annotation = view.annotation as? MAPointAnnotation else { return }
+        let markerId = markerIdByAnnotation[ObjectIdentifier(annotation)]
+        if let markerId = markerId {
+            channel.invokeMethod("marker#onTap", arguments: ["markerId": markerId])
         }
     }
 
@@ -291,13 +294,13 @@ class AMapController: NSObject, FlutterPlatformView, MAMapViewDelegate {
               let posJson = json["position"] as? [AnyHashable: Any] else { return }
         let annotation = MAPointAnnotation()
         annotation.coordinate = Convert.toLatLng(posJson)
-        annotation.title = markerId
         if let infoWindow = json["infoWindow"] as? [AnyHashable: Any] {
-            annotation.title = infoWindow["title"] as? String ?? markerId
+            annotation.title = infoWindow["title"] as? String
             annotation.subtitle = infoWindow["snippet"] as? String
         }
         mapView.addAnnotation(annotation)
         markers[markerId] = annotation
+        markerIdByAnnotation[ObjectIdentifier(annotation)] = markerId
     }
 
     private func handleMarkerUpdates(_ json: [AnyHashable: Any]) {
@@ -308,6 +311,7 @@ class AMapController: NSObject, FlutterPlatformView, MAMapViewDelegate {
             toChange.forEach { markerJson in
                 guard let markerId = markerJson["markerId"] as? String else { return }
                 if let existing = markers[markerId] {
+                    markerIdByAnnotation.removeValue(forKey: ObjectIdentifier(existing))
                     mapView.removeAnnotation(existing)
                 }
                 addMarker(markerJson)
@@ -316,6 +320,7 @@ class AMapController: NSObject, FlutterPlatformView, MAMapViewDelegate {
         if let toRemove = json["markerIdsToRemove"] as? [String] {
             toRemove.forEach { id in
                 if let annotation = markers.removeValue(forKey: id) {
+                    markerIdByAnnotation.removeValue(forKey: ObjectIdentifier(annotation))
                     mapView.removeAnnotation(annotation)
                 }
             }

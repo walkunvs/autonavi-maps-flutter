@@ -4,8 +4,9 @@ import AMapSearchKit
 class SearchChannelHandler: NSObject, FlutterPlugin, AMapSearchDelegate {
 
     private var searchAPI: AMapSearchAPI?
-    private var pendingResult: FlutterResult?
-    private var pendingMethod: String?
+    // Keyed by the ObjectIdentifier of each AMapSearch request object so
+    // multiple in-flight searches don't overwrite each other's result callback.
+    private var pendingResults: [ObjectIdentifier: FlutterResult] = [:]
 
     override init() {
         super.init()
@@ -17,24 +18,22 @@ class SearchChannelHandler: NSObject, FlutterPlugin, AMapSearchDelegate {
 
     public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
         let args = call.arguments as? [String: Any] ?? [:]
-        pendingResult = result
-        pendingMethod = call.method
 
         switch call.method {
         case "search#keyword":
-            handleKeywordSearch(args)
+            handleKeywordSearch(args, result: result)
         case "search#nearby":
-            handleNearbySearch(args)
+            handleNearbySearch(args, result: result)
         case "search#regeocode":
-            handleRegeocode(args)
+            handleRegeocode(args, result: result)
         case "search#geocode":
-            handleGeocode(args)
+            handleGeocode(args, result: result)
         case "route#driving":
-            handleDrivingRoute(args)
+            handleDrivingRoute(args, result: result)
         case "route#walking":
-            handleWalkingRoute(args)
+            handleWalkingRoute(args, result: result)
         case "search#district":
-            handleDistrictSearch(args)
+            handleDistrictSearch(args, result: result)
         default:
             result(FlutterMethodNotImplemented)
         }
@@ -42,7 +41,7 @@ class SearchChannelHandler: NSObject, FlutterPlugin, AMapSearchDelegate {
 
     // MARK: - Search Handlers
 
-    private func handleKeywordSearch(_ args: [String: Any]) {
+    private func handleKeywordSearch(_ args: [String: Any], result: @escaping FlutterResult) {
         let request = AMapPOIKeywordsSearchRequest()
         request.keywords = args["keyword"] as? String ?? ""
         request.city = args["city"] as? String ?? ""
@@ -50,10 +49,11 @@ class SearchChannelHandler: NSObject, FlutterPlugin, AMapSearchDelegate {
         request.offset = Int32(args["pageSize"] as? Int ?? 20)
         request.page = Int32(args["page"] as? Int ?? 1)
         request.requireExtension = true
+        pendingResults[ObjectIdentifier(request)] = result
         searchAPI?.aMapPOIKeywordsSearch(request)
     }
 
-    private func handleNearbySearch(_ args: [String: Any]) {
+    private func handleNearbySearch(_ args: [String: Any], result: @escaping FlutterResult) {
         let request = AMapPOIAroundSearchRequest()
         request.location = AMapGeoPoint.location(
             withLatitude: CGFloat(args["latitude"] as? Double ?? 0),
@@ -65,10 +65,11 @@ class SearchChannelHandler: NSObject, FlutterPlugin, AMapSearchDelegate {
         request.offset = Int32(args["pageSize"] as? Int ?? 20)
         request.page = Int32(args["page"] as? Int ?? 1)
         request.requireExtension = true
+        pendingResults[ObjectIdentifier(request)] = result
         searchAPI?.aMapPOIAroundSearch(request)
     }
 
-    private func handleRegeocode(_ args: [String: Any]) {
+    private func handleRegeocode(_ args: [String: Any], result: @escaping FlutterResult) {
         let request = AMapReGeocodeSearchRequest()
         request.location = AMapGeoPoint.location(
             withLatitude: CGFloat(args["latitude"] as? Double ?? 0),
@@ -76,19 +77,24 @@ class SearchChannelHandler: NSObject, FlutterPlugin, AMapSearchDelegate {
         )
         request.radius = 200
         request.requireExtension = true
+        pendingResults[ObjectIdentifier(request)] = result
         searchAPI?.aMapReGoecodeSearch(request)
     }
 
-    private func handleGeocode(_ args: [String: Any]) {
+    private func handleGeocode(_ args: [String: Any], result: @escaping FlutterResult) {
         let request = AMapGeocodeSearchRequest()
         request.address = args["address"] as? String ?? ""
         request.city = args["city"] as? String
+        pendingResults[ObjectIdentifier(request)] = result
         searchAPI?.aMapGoecodeSearch(request)
     }
 
-    private func handleDrivingRoute(_ args: [String: Any]) {
+    private func handleDrivingRoute(_ args: [String: Any], result: @escaping FlutterResult) {
         guard let originMap = args["origin"] as? [String: Any],
-              let destMap = args["destination"] as? [String: Any] else { return }
+              let destMap = args["destination"] as? [String: Any] else {
+            result(FlutterError(code: "INVALID_ARGS", message: "origin/destination required", details: nil))
+            return
+        }
         let request = AMapDrivingRouteSearchRequest()
         request.origin = AMapGeoPoint.location(
             withLatitude: CGFloat(originMap["latitude"] as? Double ?? 0),
@@ -106,12 +112,16 @@ class SearchChannelHandler: NSObject, FlutterPlugin, AMapSearchDelegate {
                 )
             }
         }
+        pendingResults[ObjectIdentifier(request)] = result
         searchAPI?.aMapDrivingRouteSearch(request)
     }
 
-    private func handleWalkingRoute(_ args: [String: Any]) {
+    private func handleWalkingRoute(_ args: [String: Any], result: @escaping FlutterResult) {
         guard let originMap = args["origin"] as? [String: Any],
-              let destMap = args["destination"] as? [String: Any] else { return }
+              let destMap = args["destination"] as? [String: Any] else {
+            result(FlutterError(code: "INVALID_ARGS", message: "origin/destination required", details: nil))
+            return
+        }
         let request = AMapWalkingRouteSearchRequest()
         request.origin = AMapGeoPoint.location(
             withLatitude: CGFloat(originMap["latitude"] as? Double ?? 0),
@@ -121,22 +131,23 @@ class SearchChannelHandler: NSObject, FlutterPlugin, AMapSearchDelegate {
             withLatitude: CGFloat(destMap["latitude"] as? Double ?? 0),
             longitude: CGFloat(destMap["longitude"] as? Double ?? 0)
         )
+        pendingResults[ObjectIdentifier(request)] = result
         searchAPI?.aMapWalkingRouteSearch(request)
     }
 
-    private func handleDistrictSearch(_ args: [String: Any]) {
+    private func handleDistrictSearch(_ args: [String: Any], result: @escaping FlutterResult) {
         let request = AMapDistrictSearchRequest()
         request.keywords = args["keywords"] as? String ?? ""
         request.level = UInt32(args["level"] as? Int ?? 3)
         request.showBoundary = false
+        pendingResults[ObjectIdentifier(request)] = result
         searchAPI?.aMapDistrictSearch(request)
     }
 
     // MARK: - AMapSearchDelegate
 
     func onPOISearchDone(_ request: AMapPOISearchBaseRequest!, response: AMapPOISearchResponse!) {
-        guard let result = pendingResult else { return }
-        pendingResult = nil
+        guard let result = pendingResults.removeValue(forKey: ObjectIdentifier(request)) else { return }
 
         guard response != nil else {
             result(FlutterError(code: "SEARCH_ERROR", message: "POI search failed", details: nil))
@@ -169,8 +180,7 @@ class SearchChannelHandler: NSObject, FlutterPlugin, AMapSearchDelegate {
     }
 
     func onReGeocodeSearchDone(_ request: AMapReGeocodeSearchRequest!, response: AMapReGeocodeSearchResponse!) {
-        guard let result = pendingResult else { return }
-        pendingResult = nil
+        guard let result = pendingResults.removeValue(forKey: ObjectIdentifier(request)) else { return }
 
         guard let address = response?.regeocode?.formattedAddress else {
             result(FlutterError(code: "REGEOCODE_ERROR", message: "Regeocode failed", details: nil))
@@ -194,8 +204,7 @@ class SearchChannelHandler: NSObject, FlutterPlugin, AMapSearchDelegate {
     }
 
     func onGeocodeSearchDone(_ request: AMapGeocodeSearchRequest!, response: AMapGeocodeSearchResponse!) {
-        guard let result = pendingResult else { return }
-        pendingResult = nil
+        guard let result = pendingResults.removeValue(forKey: ObjectIdentifier(request)) else { return }
 
         let geocodes = response?.geocodes?.map { gc -> [String: Any?] in
             return [
@@ -215,10 +224,9 @@ class SearchChannelHandler: NSObject, FlutterPlugin, AMapSearchDelegate {
     }
 
     func onRouteSearchDone(_ request: AMapRouteSearchBaseRequest!, response: AMapRouteSearchResponse!) {
-        guard let result = pendingResult else { return }
-        pendingResult = nil
+        guard let result = pendingResults.removeValue(forKey: ObjectIdentifier(request)) else { return }
 
-        if let drivingResp = response as? AMapDrivingRouteSearchResponse ?? nil {
+        if let drivingResp = response as? AMapDrivingRouteSearchResponse {
             let paths = drivingResp.route?.paths?.map { path -> [String: Any] in
                 return [
                     "distance": Double(path.distance),
@@ -242,7 +250,7 @@ class SearchChannelHandler: NSObject, FlutterPlugin, AMapSearchDelegate {
                 ]
             } ?? []
             result(["paths": paths])
-        } else if let walkingResp = response as? AMapWalkingRouteSearchResponse ?? nil {
+        } else if let walkingResp = response as? AMapWalkingRouteSearchResponse {
             let paths = walkingResp.route?.paths?.map { path -> [String: Any] in
                 return [
                     "distance": Double(path.distance),
@@ -268,8 +276,8 @@ class SearchChannelHandler: NSObject, FlutterPlugin, AMapSearchDelegate {
     }
 
     func aMapSearchRequest(_ request: Any!, didFailWithError error: Error!) {
-        guard let result = pendingResult else { return }
-        pendingResult = nil
+        guard let req = request as? AnyObject,
+              let result = pendingResults.removeValue(forKey: ObjectIdentifier(req)) else { return }
         let nsError = error as NSError
         result(FlutterError(
             code: "SEARCH_ERROR_\(nsError.code)",
@@ -279,8 +287,7 @@ class SearchChannelHandler: NSObject, FlutterPlugin, AMapSearchDelegate {
     }
 
     func onDistrictSearchDone(_ request: AMapDistrictSearchRequest!, response: AMapDistrictSearchResponse!) {
-        guard let result = pendingResult else { return }
-        pendingResult = nil
+        guard let result = pendingResults.removeValue(forKey: ObjectIdentifier(request)) else { return }
 
         func convertDistrict(_ d: AMapDistrict) -> [String: Any?] {
             let centerParts = d.center?.split(separator: ",")

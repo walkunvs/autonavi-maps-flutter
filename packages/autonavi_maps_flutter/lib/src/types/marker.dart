@@ -114,8 +114,29 @@ class Marker {
 
   @override
   bool operator ==(Object other) =>
-      other is Marker && other.markerId == markerId;
+      other is Marker &&
+      other.markerId == markerId &&
+      other.position == position &&
+      other.alpha == alpha &&
+      other.anchor == anchor &&
+      other.consumeTapEvents == consumeTapEvents &&
+      other.draggable == draggable &&
+      other.flat == flat &&
+      other.rotation == rotation &&
+      other.visible == visible &&
+      other.zIndex == zIndex;
 
   @override
-  int get hashCode => markerId.hashCode;
+  int get hashCode => Object.hash(
+        markerId,
+        position,
+        alpha,
+        anchor,
+        consumeTapEvents,
+        draggable,
+        flat,
+        rotation,
+        visible,
+        zIndex,
+      );
 }

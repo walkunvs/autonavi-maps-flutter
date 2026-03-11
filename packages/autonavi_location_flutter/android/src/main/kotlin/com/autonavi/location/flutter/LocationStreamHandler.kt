@@ -39,13 +39,19 @@ class LocationStreamHandler(private val context: Context) : EventChannel.StreamH
         client = null
     }
 
-    fun getOnce(options: Map<String, Any>, callback: (Map<String, Any?>) -> Unit) {
+    fun getOnce(
+        options: Map<String, Any>,
+        onSuccess: (Map<String, Any?>) -> Unit,
+        onError: (String, String?) -> Unit,
+    ) {
         val onceClient = AMapLocationClient(context)
         onceClient.setLocationOption(buildOption(options).apply { isOnceLocation = true })
         onceClient.setLocationListener { result ->
             onceClient.onDestroy()
             if (result.errorCode == 0) {
-                callback(buildResultMap(result))
+                onSuccess(buildResultMap(result))
+            } else {
+                onError("LOCATION_ERROR_${result.errorCode}", result.errorInfo)
             }
         }
         onceClient.startLocation()
