@@ -7,6 +7,7 @@
 .pub/
 build/
 *.lock
+!pubspec.lock
 
 # Android
 *.iml
