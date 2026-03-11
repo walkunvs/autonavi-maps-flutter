@@ -40,7 +40,12 @@ class AutonaviLocation {
       'location#getOnce',
       options.toJson(),
     );
-    if (result == null) throw PlatformException(code: 'NULL_RESULT', message: 'location#getOnce returned null');
+    if (result == null) {
+      throw PlatformException(
+        code: 'NULL_RESULT',
+        message: 'location#getOnce returned null',
+      );
+    }
     return LocationResult.fromMap(result);
   }
 

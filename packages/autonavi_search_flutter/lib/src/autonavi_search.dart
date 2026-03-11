@@ -54,7 +54,12 @@ class AutonaviSearch {
       'page': page,
       'pageSize': pageSize,
     });
-    if (result == null) throw PlatformException(code: 'NULL_RESULT', message: 'search#keyword returned null');
+    if (result == null) {
+      throw PlatformException(
+        code: 'NULL_RESULT',
+        message: 'search#keyword returned null',
+      );
+    }
     return PoiSearchResult.fromMap(result);
   }
 
@@ -76,7 +81,12 @@ class AutonaviSearch {
       'page': page,
       'pageSize': pageSize,
     });
-    if (result == null) throw PlatformException(code: 'NULL_RESULT', message: 'search#nearby returned null');
+    if (result == null) {
+      throw PlatformException(
+        code: 'NULL_RESULT',
+        message: 'search#nearby returned null',
+      );
+    }
     return PoiSearchResult.fromMap(result);
   }
 
@@ -86,7 +96,12 @@ class AutonaviSearch {
       'latitude': position.latitude,
       'longitude': position.longitude,
     });
-    if (result == null) throw PlatformException(code: 'NULL_RESULT', message: 'search#regeocode returned null');
+    if (result == null) {
+      throw PlatformException(
+        code: 'NULL_RESULT',
+        message: 'search#regeocode returned null',
+      );
+    }
     return RegeocodeResult.fromMap(result);
   }
 
@@ -99,7 +114,12 @@ class AutonaviSearch {
       'address': address,
       if (city != null) 'city': city,
     });
-    if (result == null) throw PlatformException(code: 'NULL_RESULT', message: 'search#geocode returned null');
+    if (result == null) {
+      throw PlatformException(
+        code: 'NULL_RESULT',
+        message: 'search#geocode returned null',
+      );
+    }
     return result.map((e) => GeocodeResult.fromMap(e as Map)).toList();
   }
 
@@ -114,7 +134,12 @@ class AutonaviSearch {
       'destination': destination.toJson(),
       'waypoints': waypoints.map((p) => p.toJson()).toList(),
     });
-    if (result == null) throw PlatformException(code: 'NULL_RESULT', message: 'route#driving returned null');
+    if (result == null) {
+      throw PlatformException(
+        code: 'NULL_RESULT',
+        message: 'route#driving returned null',
+      );
+    }
     return DrivingRouteResult.fromMap(result);
   }
 
@@ -127,7 +152,12 @@ class AutonaviSearch {
       'origin': origin.toJson(),
       'destination': destination.toJson(),
     });
-    if (result == null) throw PlatformException(code: 'NULL_RESULT', message: 'route#walking returned null');
+    if (result == null) {
+      throw PlatformException(
+        code: 'NULL_RESULT',
+        message: 'route#walking returned null',
+      );
+    }
     return WalkingRouteResult.fromMap(result);
   }
 
@@ -143,7 +173,12 @@ class AutonaviSearch {
       'keywords': keywords,
       'level': level,
     });
-    if (result == null) throw PlatformException(code: 'NULL_RESULT', message: 'search#district returned null');
+    if (result == null) {
+      throw PlatformException(
+        code: 'NULL_RESULT',
+        message: 'search#district returned null',
+      );
+    }
     return result.map((e) => DistrictItem.fromMap(e as Map)).toList();
   }
 }
