@@ -72,10 +72,19 @@ class Polygon {
       other.fillColor == fillColor &&
       other.geodesic == geodesic &&
       listEquals(other.points, points) &&
+      other.holes.length == holes.length &&
+      _holesEqual(other.holes, holes) &&
       other.strokeColor == strokeColor &&
       other.strokeWidth == strokeWidth &&
       other.visible == visible &&
       other.zIndex == zIndex;
+
+  static bool _holesEqual(List<List<LatLng>> a, List<List<LatLng>> b) {
+    for (int i = 0; i < a.length; i++) {
+      if (!listEquals(a[i], b[i])) return false;
+    }
+    return true;
+  }
 
   @override
   int get hashCode => Object.hash(
@@ -84,6 +93,7 @@ class Polygon {
         fillColor,
         geodesic,
         Object.hashAll(points),
+        Object.hashAll(holes.map(Object.hashAll)),
         strokeColor,
         strokeWidth,
         visible,

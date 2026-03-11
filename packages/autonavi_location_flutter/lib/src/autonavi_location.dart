@@ -40,7 +40,8 @@ class AutonaviLocation {
       'location#getOnce',
       options.toJson(),
     );
-    return LocationResult.fromMap(result!);
+    if (result == null) throw PlatformException(code: 'NULL_RESULT', message: 'location#getOnce returned null');
+    return LocationResult.fromMap(result);
   }
 
   /// Updates the options for the continuous location stream.

@@ -329,7 +329,7 @@ class SearchChannelHandler(private val context: Context) : MethodChannel.MethodC
                 "typeCode" to poi.typeCode,
                 "latitude" to poi.latLonPoint?.latitude,
                 "longitude" to poi.latLonPoint?.longitude,
-                "address" to poi.snippet,
+                "address" to poi.address,
                 "tel" to poi.tel,
                 "distance" to poi.distance.toDouble(),
                 "cityName" to poi.cityName,

@@ -54,7 +54,8 @@ class AutonaviSearch {
       'page': page,
       'pageSize': pageSize,
     });
-    return PoiSearchResult.fromMap(result!);
+    if (result == null) throw PlatformException(code: 'NULL_RESULT', message: 'search#keyword returned null');
+    return PoiSearchResult.fromMap(result);
   }
 
   /// POI nearby search.
@@ -75,7 +76,8 @@ class AutonaviSearch {
       'page': page,
       'pageSize': pageSize,
     });
-    return PoiSearchResult.fromMap(result!);
+    if (result == null) throw PlatformException(code: 'NULL_RESULT', message: 'search#nearby returned null');
+    return PoiSearchResult.fromMap(result);
   }
 
   /// Reverse geocoding: coordinate → address.
@@ -84,7 +86,8 @@ class AutonaviSearch {
       'latitude': position.latitude,
       'longitude': position.longitude,
     });
-    return RegeocodeResult.fromMap(result!);
+    if (result == null) throw PlatformException(code: 'NULL_RESULT', message: 'search#regeocode returned null');
+    return RegeocodeResult.fromMap(result);
   }
 
   /// Forward geocoding: address → coordinate(s).
@@ -96,7 +99,8 @@ class AutonaviSearch {
       'address': address,
       if (city != null) 'city': city,
     });
-    return result!.map((e) => GeocodeResult.fromMap(e as Map)).toList();
+    if (result == null) throw PlatformException(code: 'NULL_RESULT', message: 'search#geocode returned null');
+    return result.map((e) => GeocodeResult.fromMap(e as Map)).toList();
   }
 
   /// Driving route planning.
@@ -110,7 +114,8 @@ class AutonaviSearch {
       'destination': destination.toJson(),
       'waypoints': waypoints.map((p) => p.toJson()).toList(),
     });
-    return DrivingRouteResult.fromMap(result!);
+    if (result == null) throw PlatformException(code: 'NULL_RESULT', message: 'route#driving returned null');
+    return DrivingRouteResult.fromMap(result);
   }
 
   /// Walking route planning.
@@ -122,7 +127,8 @@ class AutonaviSearch {
       'origin': origin.toJson(),
       'destination': destination.toJson(),
     });
-    return WalkingRouteResult.fromMap(result!);
+    if (result == null) throw PlatformException(code: 'NULL_RESULT', message: 'route#walking returned null');
+    return WalkingRouteResult.fromMap(result);
   }
 
   /// Administrative district query.
@@ -137,6 +143,7 @@ class AutonaviSearch {
       'keywords': keywords,
       'level': level,
     });
-    return result!.map((e) => DistrictItem.fromMap(e as Map)).toList();
+    if (result == null) throw PlatformException(code: 'NULL_RESULT', message: 'search#district returned null');
+    return result.map((e) => DistrictItem.fromMap(e as Map)).toList();
   }
 }

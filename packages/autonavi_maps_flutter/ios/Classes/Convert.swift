@@ -4,8 +4,10 @@ import UIKit
 struct Convert {
 
     static func toLatLng(_ json: [AnyHashable: Any]) -> CLLocationCoordinate2D {
-        let lat = (json["latitude"] as! NSNumber).doubleValue
-        let lng = (json["longitude"] as! NSNumber).doubleValue
+        guard let lat = (json["latitude"] as? NSNumber)?.doubleValue,
+              let lng = (json["longitude"] as? NSNumber)?.doubleValue else {
+            return CLLocationCoordinate2D()
+        }
         return CLLocationCoordinate2D(latitude: lat, longitude: lng)
     }
 

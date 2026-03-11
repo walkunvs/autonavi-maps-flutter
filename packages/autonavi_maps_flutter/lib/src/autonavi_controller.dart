@@ -81,6 +81,7 @@ class AutonaviController {
       'coordinate#convertFromWGS84',
       wgs84.toJson(),
     );
-    return LatLng.fromJson(result!);
+    if (result == null) throw PlatformException(code: 'NULL_RESULT', message: 'coordinate#convertFromWGS84 returned null');
+    return LatLng.fromJson(result);
   }
 }
