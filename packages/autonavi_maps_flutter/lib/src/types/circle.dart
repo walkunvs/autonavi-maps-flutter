@@ -63,8 +63,27 @@ class Circle {
 
   @override
   bool operator ==(Object other) =>
-      other is Circle && other.circleId == circleId;
+      other is Circle &&
+      other.circleId == circleId &&
+      other.center == center &&
+      other.radius == radius &&
+      other.consumeTapEvents == consumeTapEvents &&
+      other.fillColor == fillColor &&
+      other.strokeColor == strokeColor &&
+      other.strokeWidth == strokeWidth &&
+      other.visible == visible &&
+      other.zIndex == zIndex;
 
   @override
-  int get hashCode => circleId.hashCode;
+  int get hashCode => Object.hash(
+        circleId,
+        center,
+        radius,
+        consumeTapEvents,
+        fillColor,
+        strokeColor,
+        strokeWidth,
+        visible,
+        zIndex,
+      );
 }

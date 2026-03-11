@@ -192,7 +192,10 @@ class AMapController(
     }
 
     override fun onMarkerClick(marker: Marker): Boolean {
-        channel.invokeMethod("marker#onTap", mapOf("markerId" to marker.title))
+        val markerId = markers.entries.firstOrNull { it.value == marker }?.key
+        if (markerId != null) {
+            channel.invokeMethod("marker#onTap", mapOf("markerId" to markerId))
+        }
         return marker.isInfoWindowShown.not()
     }
 
@@ -249,6 +252,18 @@ class AMapController(
                 (sb["dy"] as Number).toFloat(),
             )
         }
+        json["newLatLngBounds"]?.let { nb ->
+            val nbMap = nb as Map<*, *>
+            val boundsMap = nbMap["bounds"] as Map<*, *>
+            val southwest = Convert.toLatLng(boundsMap["southwest"] as Map<*, *>)
+            val northeast = Convert.toLatLng(boundsMap["northeast"] as Map<*, *>)
+            val bounds = com.amap.api.maps.model.LatLngBounds.Builder()
+                .include(southwest)
+                .include(northeast)
+                .build()
+            val padding = (nbMap["padding"] as? Number)?.toInt() ?: 0
+            return CameraUpdateFactory.newLatLngBounds(bounds, padding)
+        }
         return null
     }
 
@@ -256,7 +271,9 @@ class AMapController(
     private fun addMarker(json: Map<*, *>) {
         val markerId = json["markerId"] as String
         val options = Convert.toMarkerOptions(json)
-        options.title(markerId)
+        val infoWindow = json["infoWindow"] as? Map<*, *>
+        options.title(infoWindow?.get("title") as? String ?: "")
+        options.snippet(infoWindow?.get("snippet") as? String)
         val marker = aMap.addMarker(options)
         markers[markerId] = marker
     }

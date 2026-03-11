@@ -66,8 +66,27 @@ class Polygon {
 
   @override
   bool operator ==(Object other) =>
-      other is Polygon && other.polygonId == polygonId;
+      other is Polygon &&
+      other.polygonId == polygonId &&
+      other.consumeTapEvents == consumeTapEvents &&
+      other.fillColor == fillColor &&
+      other.geodesic == geodesic &&
+      listEquals(other.points, points) &&
+      other.strokeColor == strokeColor &&
+      other.strokeWidth == strokeWidth &&
+      other.visible == visible &&
+      other.zIndex == zIndex;
 
   @override
-  int get hashCode => polygonId.hashCode;
+  int get hashCode => Object.hash(
+        polygonId,
+        consumeTapEvents,
+        fillColor,
+        geodesic,
+        Object.hashAll(points),
+        strokeColor,
+        strokeWidth,
+        visible,
+        zIndex,
+      );
 }

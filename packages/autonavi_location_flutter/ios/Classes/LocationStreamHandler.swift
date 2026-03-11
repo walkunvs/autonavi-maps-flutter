@@ -5,7 +5,7 @@ class LocationStreamHandler: NSObject, FlutterStreamHandler, AMapLocationManager
 
     private var locationManager: AMapLocationManager?
     private var eventSink: FlutterEventSink?
-    private var onceCallback: (([String: Any?]) -> Void)?
+    private var onceCallback: ((Any?) -> Void)?
     private var isOnce = false
 
     // MARK: - FlutterStreamHandler
@@ -24,7 +24,7 @@ class LocationStreamHandler: NSObject, FlutterStreamHandler, AMapLocationManager
 
     // MARK: - Public
 
-    func getOnce(options: [String: Any], callback: @escaping ([String: Any?]) -> Void) {
+    func getOnce(options: [String: Any], callback: @escaping (Any?) -> Void) {
         onceCallback = callback
         startLocation(options: options, once: true)
     }
@@ -52,8 +52,15 @@ class LocationStreamHandler: NSObject, FlutterStreamHandler, AMapLocationManager
     func amapLocationManager(_ manager: AMapLocationManager!, didFailWithError error: Error!) {
         let nsError = error as NSError
         if isOnce {
-            onceCallback?([:])
+            let flutterError = FlutterError(
+                code: "LOCATION_ERROR_\(nsError.code)",
+                message: nsError.localizedDescription,
+                details: nil
+            )
+            let callback = onceCallback
             onceCallback = nil
+            stopLocation()
+            callback?(flutterError)
         } else {
             eventSink?(FlutterError(
                 code: "LOCATION_ERROR_\(nsError.code)",

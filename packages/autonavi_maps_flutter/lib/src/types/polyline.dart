@@ -65,10 +65,33 @@ class Polyline {
 
   @override
   bool operator ==(Object other) =>
-      other is Polyline && other.polylineId == polylineId;
+      other is Polyline &&
+      other.polylineId == polylineId &&
+      other.consumeTapEvents == consumeTapEvents &&
+      other.color == color &&
+      other.endCap == endCap &&
+      other.geodesic == geodesic &&
+      other.jointType == jointType &&
+      listEquals(other.points, points) &&
+      other.startCap == startCap &&
+      other.visible == visible &&
+      other.width == width &&
+      other.zIndex == zIndex;
 
   @override
-  int get hashCode => polylineId.hashCode;
+  int get hashCode => Object.hash(
+        polylineId,
+        consumeTapEvents,
+        color,
+        endCap,
+        geodesic,
+        jointType,
+        Object.hashAll(points),
+        startCap,
+        visible,
+        width,
+        zIndex,
+      );
 }
 
 /// Cap that can be applied to the start or end vertex of a [Polyline].

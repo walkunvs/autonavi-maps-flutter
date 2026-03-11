@@ -171,11 +171,13 @@ class SearchChannelHandler: NSObject, FlutterPlugin, AMapSearchDelegate {
             ]
         } ?? []
 
+        let pageSize = request.offset > 0 ? Int(request.offset) : 20
+        let pageNum = request.page > 0 ? Int(request.page) : 1
         result([
             "pois": pois,
             "totalCount": response.count,
-            "pageCount": (response.count + 19) / 20,
-            "pageNum": 1,
+            "pageCount": response.count > 0 ? (Int(response.count) + pageSize - 1) / pageSize : 0,
+            "pageNum": pageNum,
         ] as [String: Any])
     }
 
