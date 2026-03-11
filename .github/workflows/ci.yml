@@ -20,20 +20,17 @@ jobs:
           cache: true
 
       - name: Install Melos
-        run: dart pub global activate melos
-
-      - name: Bootstrap
-        run: melos bootstrap
+        run: dart pub get && dart run melos bootstrap
 
       - name: Analyze
-        run: melos run analyze
+        run: dart run melos run analyze
 
       - name: Test
-        run: melos run test
+        run: dart run melos run test
 
       - name: Format check
         run: |
-          melos exec -- dart format --output=none --set-exit-if-changed .
+          dart run melos exec -- dart format --output=none --set-exit-if-changed .
 
   android_build:
     name: Android Build
@@ -53,10 +50,7 @@ jobs:
           cache: true
 
       - name: Install Melos
-        run: dart pub global activate melos
-
-      - name: Bootstrap
-        run: melos bootstrap
+        run: dart pub get && dart run melos bootstrap
 
       - name: Build Android APK (example)
         run: flutter build apk --debug --dart-define=AMAP_API_KEY=${{ secrets.AMAP_API_KEY }}
@@ -75,10 +69,7 @@ jobs:
           cache: true
 
       - name: Install Melos
-        run: dart pub global activate melos
-
-      - name: Bootstrap
-        run: melos bootstrap
+        run: dart pub get && dart run melos bootstrap
 
       - name: Pod Install
         run: pod install
