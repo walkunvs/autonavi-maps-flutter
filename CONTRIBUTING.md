@@ -5,8 +5,8 @@ Thank you for your interest in contributing!
 ## Development Setup
 
 1. Fork and clone the repository
-2. Install [Melos](https://melos.invertase.dev): `dart pub global activate melos`
-3. Run `melos bootstrap` to link packages and install dependencies
+2. Run `dart pub get` to install Melos (declared in the root `pubspec.yaml`)
+3. Run `dart run melos bootstrap` to link packages and install dependencies
 
 ## Project Structure
 
@@ -24,9 +24,9 @@ autonavi-maps-flutter/
 
 1. Create a feature branch from `main`
 2. Make your changes
-3. Run `melos run analyze` to check for issues
-4. Run `melos run test` to run tests
-5. Run `melos run format` to format code
+3. Run `dart run melos run analyze` to check for issues
+4. Run `dart run melos run test` to run tests
+5. Run `dart run melos run format` to format code
 6. Submit a pull request
 
 ## Commit Messages

@@ -118,20 +118,20 @@ final route = await AutonaviSearch.drivingRoute(
 This repository uses [Melos](https://melos.invertase.dev) to manage the monorepo.
 
 ```bash
-# Install Melos
-dart pub global activate melos
+# Install Melos (declared in root pubspec.yaml)
+dart pub get
 
 # Bootstrap all packages
-melos bootstrap
+dart run melos bootstrap
 
 # Run analysis
-melos run analyze
+dart run melos run analyze
 
 # Run tests
-melos run test
+dart run melos run test
 
 # Format code
-melos run format
+dart run melos run format
 ```
 
 ## Important Notes
