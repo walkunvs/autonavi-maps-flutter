@@ -30,7 +30,8 @@ typedef CameraPositionCallback = void Function(CameraPosition position);
 class MinMaxZoomPreference {
   const MinMaxZoomPreference(this.minZoom, this.maxZoom);
 
-  static const MinMaxZoomPreference unbounded = MinMaxZoomPreference(null, null);
+  static const MinMaxZoomPreference unbounded =
+      MinMaxZoomPreference(null, null);
 
   final double? minZoom;
   final double? maxZoom;
@@ -161,7 +162,9 @@ class _AutonaviWidgetState extends State<AutonaviWidget> {
       );
     }
 
-    return const Center(child: Text('AutoNavi Maps is not supported on this platform.'));
+    return const Center(
+      child: Text('AutoNavi Maps is not supported on this platform.'),
+    );
   }
 
   @override
@@ -203,7 +206,8 @@ class _AutonaviWidgetState extends State<AutonaviWidget> {
   }
 
   void _onMarkerTap(MarkerId markerId) {
-    final marker = widget.markers.where((m) => m.markerId == markerId).firstOrNull;
+    final marker =
+        widget.markers.where((m) => m.markerId == markerId).firstOrNull;
     marker?.onTap?.call();
   }
 

@@ -35,5 +35,6 @@ class DistrictItem {
       );
 
   @override
-  String toString() => 'DistrictItem(name: $name, level: $level, adCode: $adCode)';
+  String toString() =>
+      'DistrictItem(name: $name, level: $level, adCode: $adCode)';
 }

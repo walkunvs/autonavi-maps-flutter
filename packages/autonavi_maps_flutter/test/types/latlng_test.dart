@@ -17,7 +17,10 @@ void main() {
     });
 
     test('fromJson parses correctly', () {
-      final latlng = LatLng.fromJson({'latitude': 39.909187, 'longitude': 116.397451});
+      final latlng = LatLng.fromJson({
+        'latitude': 39.909187,
+        'longitude': 116.397451,
+      });
       expect(latlng.latitude, 39.909187);
       expect(latlng.longitude, 116.397451);
     });

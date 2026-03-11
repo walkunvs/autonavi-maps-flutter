@@ -33,7 +33,8 @@ class LatLngBounds {
       );
 
   @override
-  String toString() => 'LatLngBounds(southwest: $southwest, northeast: $northeast)';
+  String toString() =>
+      'LatLngBounds(southwest: $southwest, northeast: $northeast)';
 
   @override
   bool operator ==(Object other) =>

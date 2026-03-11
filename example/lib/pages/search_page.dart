@@ -267,7 +267,10 @@ class _RegeocodeTab extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('结果', style: Theme.of(context).textTheme.titleMedium),
+                    Text(
+                      '结果',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
                     const Divider(),
                     _Row('地址', result!.formattedAddress),
                     _Row('省份', result!.province),

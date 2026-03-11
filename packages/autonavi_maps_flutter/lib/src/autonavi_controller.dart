@@ -31,8 +31,8 @@ class AutonaviController {
 
   /// Returns the current camera position.
   Future<CameraPosition?> getCameraPosition() async {
-    final result =
-        await _channel.invokeMapMethod<String, dynamic>('map#getCameraPosition');
+    final result = await _channel
+        .invokeMapMethod<String, dynamic>('map#getCameraPosition');
     return result == null ? null : CameraPosition.fromJson(result);
   }
 
@@ -60,11 +60,17 @@ class AutonaviController {
 
   /// Shows the info window for the marker with [markerId].
   Future<void> showMarkerInfoWindow(MarkerId markerId) =>
-      _channel.invokeMethod('markers#showInfoWindow', {'markerId': markerId.value});
+      _channel.invokeMethod(
+        'markers#showInfoWindow',
+        {'markerId': markerId.value},
+      );
 
   /// Hides the info window for the marker with [markerId].
   Future<void> hideMarkerInfoWindow(MarkerId markerId) =>
-      _channel.invokeMethod('markers#hideInfoWindow', {'markerId': markerId.value});
+      _channel.invokeMethod(
+        'markers#hideInfoWindow',
+        {'markerId': markerId.value},
+      );
 
   /// Returns whether the info window for the marker with [markerId] is shown.
   Future<bool> isMarkerInfoWindowShown(MarkerId markerId) async {
