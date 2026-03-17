@@ -3,8 +3,8 @@ name: CI
 on:
   push:
     branches: [main, develop]
-  pull_request:
-    branches: [main]
+  # pull_request CI is handled by pr-build-report.yml which also writes
+  # error reports back to the PR branch. Keep this workflow for push only.
 
 jobs:
   analyze_and_test:
