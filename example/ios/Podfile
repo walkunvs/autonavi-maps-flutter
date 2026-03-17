@@ -28,11 +28,7 @@ require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelpe
 flutter_ios_podfile_setup
 
 target 'Runner' do
-  # AMap SDKs ship as pre-compiled static frameworks (.framework with static
-  # archives inside). Using dynamic frameworks (the default `use_frameworks!`)
-  # causes CocoaPods to reject them with a "transitive statically linked
-  # binaries" error. Forcing static linkage for all pods resolves this.
-  use_frameworks! :linkage => :static
+  use_frameworks!
   use_modular_headers!
 
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))

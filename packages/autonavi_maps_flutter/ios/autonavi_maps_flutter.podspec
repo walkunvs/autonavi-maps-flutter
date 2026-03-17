@@ -11,6 +11,8 @@ Provides map rendering, camera control, and map overlays.
   s.author           = { 'AutoNavi Maps Flutter' => 'dev@example.com' }
   s.source           = { :path => '.' }
   s.source_files     = 'Classes/**/*'
+  s.static_framework = true
+
   s.dependency 'Flutter'
   s.dependency 'AMap3DMap', '~> 9.7'
   s.platform         = :ios, '12.0'
