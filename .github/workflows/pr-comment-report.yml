@@ -8,6 +8,7 @@ on:
 # Runs in base repo context — has write permission regardless of fork
 permissions:
   pull-requests: write
+  actions: read
 
 jobs:
   comment:
