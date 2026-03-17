@@ -68,10 +68,16 @@ jobs:
         working-directory: example/android
 
       # ── Create PR with all lock files ───────────────────────────────────
+      # Uses PAT_TOKEN secret if available (needed when repo settings restrict
+      # GITHUB_TOKEN from creating PRs). To enable: add a PAT with repo scope
+      # as a repository secret named PAT_TOKEN, OR enable
+      # "Allow GitHub Actions to create and approve pull requests" in
+      # Settings > Actions > General > Workflow permissions.
       - name: Create Pull Request
+        id: create-pr
         uses: peter-evans/create-pull-request@v6
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
           branch: chore/lock-files-flutter-${{ inputs.flutter_version }}
           commit-message: "chore: update lock files for Flutter ${{ inputs.flutter_version }}"
           title: "chore: update lock files for Flutter ${{ inputs.flutter_version }}"
@@ -104,3 +110,24 @@ jobs:
             dependencies
             automated
           delete-branch: true
+
+      - name: PR creation summary
+        if: always()
+        run: |
+          if [ -n "${{ steps.create-pr.outputs.pull-request-url }}" ]; then
+            echo "### Pull Request Created" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**URL:** ${{ steps.create-pr.outputs.pull-request-url }}" >> $GITHUB_STEP_SUMMARY
+          else
+            BRANCH="chore/lock-files-flutter-${{ inputs.flutter_version }}"
+            echo "### Lock files committed to branch" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Branch \`${BRANCH}\` was pushed but PR creation was skipped (no changes or insufficient token permissions)." >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**To create the PR manually:**" >> $GITHUB_STEP_SUMMARY
+            echo "${{ github.server_url }}/${{ github.repository }}/compare/${BRANCH}?expand=1" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Or enable PR creation via Actions:** Settings → Actions → General → Workflow permissions → ✅ Allow GitHub Actions to create and approve pull requests" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Or add a PAT:** Create a token with \`repo\` scope and save it as repository secret \`PAT_TOKEN\`." >> $GITHUB_STEP_SUMMARY
+          fi
