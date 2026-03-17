@@ -12,7 +12,7 @@ Provides continuous location stream and geofencing.
   s.source           = { :path => '.' }
   s.source_files     = 'Classes/**/*'
   s.dependency 'Flutter'
-  s.dependency 'AMapLocation', '~> 2.10'
+  s.dependency 'AMapLocation', '~> 2.11'
   s.platform         = :ios, '12.0'
 
   s.pod_target_xcconfig = { 'DEFINES_MODULE' => 'YES', 'EXCLUDED_ARCHS[sdk=iphonesimulator*]' => 'i386' }

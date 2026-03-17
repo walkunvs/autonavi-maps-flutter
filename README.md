@@ -10,6 +10,26 @@ A Flutter plugin ecosystem for AutoNavi (高德地图) Maps, providing a complet
 | [`autonavi_location_flutter`](packages/autonavi_location_flutter) | 0.1.0 | Location stream, geofencing |
 | [`autonavi_search_flutter`](packages/autonavi_search_flutter) | 0.1.0 | POI search, geocoding, route planning |
 
+## 高德地图原生 SDK 版本
+
+每次发布新版本时会同步更新为[高德开放平台](https://lbs.amap.com)官网最新的原生 SDK 版本。
+
+### Android (`com.amap.api`)
+
+| 依赖 | 当前版本 | 官方更新记录 |
+|------|---------|-------------|
+| `3dmap` | `11.1.000` | [地图 SDK 更新日志](https://lbs.amap.com/api/android-sdk/changelog/3d) |
+| `search` | `9.7.4` | [搜索 SDK 更新日志](https://lbs.amap.com/api/android-sdk/changelog/search) |
+| `location` | `6.5.1` | [定位 SDK 更新日志](https://lbs.amap.com/api/android-location-sdk/changelog) |
+
+### iOS (CocoaPods)
+
+| 依赖 | 当前版本约束 | 官方更新记录 |
+|------|------------|-------------|
+| `AMap3DMap` | `~> 9.7` (最新 9.7.0) | [地图 SDK 更新日志](https://lbs.amap.com/api/ios-sdk/changelog) |
+| `AMapSearch` | `~> 9.7` (最新 9.7.0) | [搜索 SDK 更新日志](https://lbs.amap.com/api/ios-sdk/changelog/search) |
+| `AMapLocation` | `~> 2.11` (最新 2.11.0) | [定位 SDK 更新日志](https://lbs.amap.com/api/ios-location-sdk/changelog) |
+
 ## Roadmap
 
 | Package | Status |
