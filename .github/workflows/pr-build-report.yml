@@ -118,7 +118,7 @@ jobs:
         working-directory: example
 
       - name: Pod install
-        run: pod install
+        run: pod install --repo-update
         working-directory: example/ios
 
       - name: Build iOS (no codesign)
