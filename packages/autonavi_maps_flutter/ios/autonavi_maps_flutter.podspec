@@ -12,7 +12,7 @@ Provides map rendering, camera control, and map overlays.
   s.source           = { :path => '.' }
   s.source_files     = 'Classes/**/*'
   s.dependency 'Flutter'
-  s.dependency 'AMap3DMap', '~> 9.8'
+  s.dependency 'AMap3DMap', '~> 9.7'
   s.platform         = :ios, '12.0'
 
   s.pod_target_xcconfig = { 'DEFINES_MODULE' => 'YES', 'EXCLUDED_ARCHS[sdk=iphonesimulator*]' => 'i386' }
