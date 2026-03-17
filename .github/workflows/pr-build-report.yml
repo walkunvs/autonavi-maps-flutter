@@ -49,7 +49,7 @@ jobs:
 
       - name: Flutter Analyze
         id: analyze
-        run: dart run melos run analyze 2>&1 | tee /tmp/analyze.log; exit ${PIPESTATUS[0]}
+        run: dart run melos exec -- "flutter analyze" 2>&1 | tee /tmp/analyze.log; exit ${PIPESTATUS[0]}
         continue-on-error: true
 
       - uses: actions/upload-artifact@v6
@@ -89,6 +89,8 @@ jobs:
             --dart-define=AMAP_API_KEY=${{ secrets.AMAP_API_KEY || 'placeholder' }} \
             2>&1 | tee /tmp/android.log; exit ${PIPESTATUS[0]}
         working-directory: example
+        env:
+          AMAP_API_KEY: ${{ secrets.AMAP_API_KEY || 'placeholder' }}
         continue-on-error: true
 
       - uses: actions/upload-artifact@v6

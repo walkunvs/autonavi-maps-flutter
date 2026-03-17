@@ -15,7 +15,6 @@ Provides map rendering, camera control, and map overlays.
 
   s.dependency 'Flutter'
   s.dependency 'AMap3DMap', '~> 9.7'
-  s.dependency 'AMapLocation', '~> 2.11'
   s.platform         = :ios, '12.0'
 
   s.pod_target_xcconfig = { 'DEFINES_MODULE' => 'YES', 'EXCLUDED_ARCHS[sdk=iphonesimulator*]' => 'i386' }
