@@ -79,6 +79,10 @@ jobs:
       - name: Melos bootstrap
         run: dart pub get && dart run melos bootstrap
 
+      - name: Recreate example platform files
+        run: flutter create . --platforms android,ios
+        working-directory: example
+
       - name: Build Android APK (debug)
         id: build
         run: |
@@ -112,6 +116,10 @@ jobs:
 
       - name: Melos bootstrap
         run: dart pub get && dart run melos bootstrap
+
+      - name: Recreate example platform files
+        run: flutter create . --platforms android,ios
+        working-directory: example
 
       - name: Flutter pub get in example
         run: flutter pub get
