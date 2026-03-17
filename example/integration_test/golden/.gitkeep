@@ -1,0 +1,14 @@
+# Golden baseline PNG screenshots live here.
+#
+# To establish or update baselines:
+#   1. Run the integration tests to generate screenshots/:
+#        flutter test integration_test/map_rendering_test.dart \
+#          --dart-define=AMAP_IOS_KEY=<key>
+#   2. Review the screenshots visually.
+#   3. Copy approved screenshots here:
+#        cp integration_test/screenshots/*.png integration_test/golden/
+#   4. Commit the golden files.
+#
+# The golden_diff.py CI script compares every *.png in this directory against
+# the corresponding file in screenshots/ and fails if pixel difference exceeds
+# the configured threshold.

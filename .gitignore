@@ -63,3 +63,8 @@ Thumbs.db
 # Environment
 .env
 *.env.local
+
+# Integration test outputs (actual screenshots, diffs)
+# Golden baselines in golden/ ARE committed.
+example/integration_test/screenshots/*.png
+example/integration_test/diffs/
