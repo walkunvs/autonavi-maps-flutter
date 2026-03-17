@@ -5,26 +5,19 @@ on:
     branches: [main]
     types: [opened, synchronize, reopened]
 
-# Allow writing back to the PR branch and posting comments
 permissions:
-  contents: write
   pull-requests: write
-  issues: write
 
 jobs:
-  # ── 1. Analyze ────────────────────────────────────────────────────────────
+  # ── 1. Flutter Analyze ────────────────────────────────────────────────────
   analyze:
     name: Flutter Analyze
     runs-on: ubuntu-latest
     outputs:
       status: ${{ steps.analyze.outcome }}
-      log: ${{ steps.read_log.outputs.log }}
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.head_ref }}
-          token: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: subosito/flutter-action@v2
         with:
@@ -40,20 +33,11 @@ jobs:
         run: dart run melos run analyze 2>&1 | tee /tmp/analyze.log; exit ${PIPESTATUS[0]}
         continue-on-error: true
 
-      - name: Read log
-        id: read_log
-        if: steps.analyze.outcome == 'failure'
-        run: |
-          LOG=$(tail -100 /tmp/analyze.log | sed 's/`/\\`/g')
-          echo "log<<EOF" >> $GITHUB_OUTPUT
-          echo "$LOG" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-
       - name: Upload analyze log
-        if: steps.analyze.outcome == 'failure'
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: analyze-log
+          name: log-analyze
           path: /tmp/analyze.log
 
   # ── 2. Android Build ──────────────────────────────────────────────────────
@@ -62,13 +46,9 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       status: ${{ steps.build.outcome }}
-      log: ${{ steps.read_log.outputs.log }}
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.head_ref }}
-          token: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: actions/setup-java@v4
         with:
@@ -93,20 +73,11 @@ jobs:
         working-directory: example
         continue-on-error: true
 
-      - name: Read log
-        id: read_log
-        if: steps.build.outcome == 'failure'
-        run: |
-          LOG=$(tail -100 /tmp/android.log | sed 's/`/\\`/g')
-          echo "log<<EOF" >> $GITHUB_OUTPUT
-          echo "$LOG" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-
       - name: Upload android log
-        if: steps.build.outcome == 'failure'
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: android-build-log
+          name: log-android
           path: /tmp/android.log
 
   # ── 3. iOS Build ──────────────────────────────────────────────────────────
@@ -115,13 +86,9 @@ jobs:
     runs-on: macos-latest
     outputs:
       status: ${{ steps.build.outcome }}
-      log: ${{ steps.read_log.outputs.log }}
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.head_ref }}
-          token: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: subosito/flutter-action@v2
         with:
@@ -149,136 +116,98 @@ jobs:
         working-directory: example
         continue-on-error: true
 
-      - name: Read log
-        id: read_log
-        if: steps.build.outcome == 'failure'
-        run: |
-          LOG=$(tail -100 /tmp/ios.log | sed 's/`/\\`/g')
-          echo "log<<EOF" >> $GITHUB_OUTPUT
-          echo "$LOG" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-
       - name: Upload ios log
-        if: steps.build.outcome == 'failure'
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: ios-build-log
+          name: log-ios
           path: /tmp/ios.log
 
-  # ── 4. Report errors back to the PR ──────────────────────────────────────
+  # ── 4. Report: post / update a single PR comment ─────────────────────────
   report:
     name: Report Build Results
     runs-on: ubuntu-latest
     needs: [analyze, android-build, ios-build]
-    # Always run so we can post success/failure summary
     if: always()
 
     steps:
-      - name: Checkout PR branch
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.head_ref }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-          fetch-depth: 0
-
       - name: Download all logs
         uses: actions/download-artifact@v4
         with:
           path: /tmp/ci-logs
         continue-on-error: true
 
-      # ── Commit error report file to PR branch (visible in diff) ──────────
-      - name: Write error report file and commit to PR branch
-        if: |
-          needs.analyze.outputs.status == 'failure' ||
-          needs.android-build.outputs.status == 'failure' ||
-          needs.ios-build.outputs.status == 'failure'
+      - name: Build and post PR comment
+        uses: actions/github-script@v7
         env:
           ANALYZE_STATUS: ${{ needs.analyze.outputs.status }}
           ANDROID_STATUS: ${{ needs.android-build.outputs.status }}
           IOS_STATUS: ${{ needs.ios-build.outputs.status }}
-        run: |
-          mkdir -p .ci
-
-          cat > .ci/BUILD_ERRORS.md << 'REPORT_EOF'
-          # CI Build Errors
-
-          > Auto-generated by PR Build & Report workflow. Fix the issues below and push to clear this file.
-
-          REPORT_EOF
-
-          echo "**Run:** [${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})" >> .ci/BUILD_ERRORS.md
-          echo "" >> .ci/BUILD_ERRORS.md
-          echo "| Job | Status |" >> .ci/BUILD_ERRORS.md
-          echo "|-----|--------|" >> .ci/BUILD_ERRORS.md
-          echo "| Flutter Analyze | $([[ "$ANALYZE_STATUS" == "failure" ]] && echo '❌ Failed' || echo '✅ Passed') |" >> .ci/BUILD_ERRORS.md
-          echo "| Android Build   | $([[ "$ANDROID_STATUS" == "failure" ]] && echo '❌ Failed' || echo '✅ Passed') |" >> .ci/BUILD_ERRORS.md
-          echo "| iOS Build       | $([[ "$IOS_STATUS"   == "failure" ]] && echo '❌ Failed' || echo '✅ Passed') |" >> .ci/BUILD_ERRORS.md
-          echo "" >> .ci/BUILD_ERRORS.md
-
-          # Append full logs from artifacts
-          for log_file in /tmp/ci-logs/**/*.log; do
-            [ -f "$log_file" ] || continue
-            job_name=$(basename "$(dirname "$log_file")")
-            echo "## $job_name" >> .ci/BUILD_ERRORS.md
-            echo '```' >> .ci/BUILD_ERRORS.md
-            tail -150 "$log_file" >> .ci/BUILD_ERRORS.md
-            echo '```' >> .ci/BUILD_ERRORS.md
-            echo "" >> .ci/BUILD_ERRORS.md
-          done
-
-          git config user.name  "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-          git add .ci/BUILD_ERRORS.md
-
-          if git diff --cached --quiet; then
-            echo "No change in error report, skipping commit."
-          else
-            git commit -m "ci: update build error report [skip ci]"
-            git push origin HEAD:${{ github.head_ref }}
-          fi
-
-      # ── Remove error file if all builds pass ─────────────────────────────
-      - name: Remove error report file if all builds pass
-        if: |
-          needs.analyze.outputs.status == 'success' &&
-          needs.android-build.outputs.status == 'success' &&
-          needs.ios-build.outputs.status == 'success'
-        run: |
-          if [ -f .ci/BUILD_ERRORS.md ]; then
-            git config user.name  "github-actions[bot]"
-            git config user.email "github-actions[bot]@users.noreply.github.com"
-            git rm .ci/BUILD_ERRORS.md
-            git commit -m "ci: all builds passing, remove error report [skip ci]"
-            git push origin HEAD:${{ github.head_ref }}
-          fi
-
-      # ── Post / update PR comment (always visible even without diff view) ─
-      - name: Find existing CI comment
-        uses: peter-evans/find-comment@v3
-        id: find_comment
         with:
-          issue-number: ${{ github.event.pull_request.number }}
-          comment-author: 'github-actions[bot]'
-          body-includes: '<!-- ci-build-report -->'
+          script: |
+            const fs = require('fs');
 
-      - name: Create or update PR comment
-        uses: peter-evans/create-or-update-comment@v4
-        with:
-          comment-id: ${{ steps.find_comment.outputs.comment-id }}
-          issue-number: ${{ github.event.pull_request.number }}
-          edit-mode: replace
-          body: |
-            <!-- ci-build-report -->
-            ## CI Build Report
+            const jobs = [
+              { label: 'Flutter Analyze', status: process.env.ANALYZE_STATUS, logFile: '/tmp/ci-logs/log-analyze/analyze.log' },
+              { label: 'Android Build',   status: process.env.ANDROID_STATUS,  logFile: '/tmp/ci-logs/log-android/android.log' },
+              { label: 'iOS Build',       status: process.env.IOS_STATUS,       logFile: '/tmp/ci-logs/log-ios/ios.log' },
+            ];
 
-            | Job | Status |
-            |-----|--------|
-            | Flutter Analyze | ${{ needs.analyze.outputs.status == 'success' && '✅ Passed' || needs.analyze.outputs.status == 'failure' && '❌ Failed' || '⏭️ Skipped' }} |
-            | Android Build   | ${{ needs.android-build.outputs.status == 'success' && '✅ Passed' || needs.android-build.outputs.status == 'failure' && '❌ Failed' || '⏭️ Skipped' }} |
-            | iOS Build       | ${{ needs.ios-build.outputs.status == 'success' && '✅ Passed' || needs.ios-build.outputs.status == 'failure' && '❌ Failed' || '⏭️ Skipped' }} |
+            const icon = s => s === 'success' ? '✅' : s === 'failure' ? '❌' : '⏭️';
+            const allPassed = jobs.every(j => j.status === 'success');
 
-            ${{ (needs.analyze.outputs.status == 'failure' || needs.android-build.outputs.status == 'failure' || needs.ios-build.outputs.status == 'failure') && '> ⚠️ Build errors have been committed to `.ci/BUILD_ERRORS.md` in this PR branch. Fix the issues and push to trigger a new run.' || '> ✅ All checks passed!' }}
+            // Status table
+            let body = `<!-- ci-build-report -->\n## CI Build Report\n\n`;
+            body += `| Job | Status |\n|-----|--------|\n`;
+            for (const j of jobs) {
+              body += `| ${j.label} | ${icon(j.status)} ${j.status ?? 'skipped'} |\n`;
+            }
+            body += `\n`;
 
-            **Run:** [${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+            // Append error logs for failed jobs
+            const failedJobs = jobs.filter(j => j.status === 'failure');
+            if (failedJobs.length > 0) {
+              body += `---\n### Error Details\n\n`;
+              for (const j of failedJobs) {
+                body += `<details>\n<summary>❌ ${j.label} — error log (last 100 lines)</summary>\n\n\`\`\`\n`;
+                try {
+                  const raw = fs.readFileSync(j.logFile, 'utf8');
+                  const lines = raw.split('\n');
+                  body += lines.slice(-100).join('\n');
+                } catch {
+                  body += '(log not available)';
+                }
+                body += `\n\`\`\`\n</details>\n\n`;
+              }
+            } else {
+              body += `> ✅ All checks passed!\n`;
+            }
+
+            body += `\n**Run:** [${context.runId}](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})`;
+
+            // Find and update existing comment, or create new one
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const existing = comments.find(c =>
+              c.user.login === 'github-actions[bot]' &&
+              c.body.includes('<!-- ci-build-report -->')
+            );
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
