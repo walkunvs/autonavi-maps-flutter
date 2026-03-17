@@ -1,0 +1,7 @@
+# Screenshots produced by integration test runs are written here at runtime.
+#
+# This directory is NOT committed to the repository (see .gitignore).
+# It is populated each time the integration tests run on CI or locally.
+#
+# The golden_diff.py script reads from this directory when comparing against
+# the golden/ baselines.
