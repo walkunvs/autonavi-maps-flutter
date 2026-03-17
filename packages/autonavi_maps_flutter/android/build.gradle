@@ -46,5 +46,5 @@ android {
 }
 
 dependencies {
-    implementation 'com.amap.api:3dmap:9.8.4'
+    implementation 'com.amap.api:3dmap:11.1.000'
 }
