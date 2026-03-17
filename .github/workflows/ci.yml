@@ -51,10 +51,6 @@ jobs:
       - name: Install Melos
         run: dart pub get && dart run melos bootstrap
 
-      - name: Recreate example platform files
-        run: flutter create . --platforms android,ios
-        working-directory: example
-
       - name: Build Android APK (example)
         run: flutter build apk --debug --dart-define=AMAP_API_KEY=${{ secrets.AMAP_API_KEY }}
         working-directory: example
@@ -73,10 +69,6 @@ jobs:
 
       - name: Install Melos
         run: dart pub get && dart run melos bootstrap
-
-      - name: Recreate example platform files
-        run: flutter create . --platforms android,ios
-        working-directory: example
 
       - name: Pod Install
         run: pod install
