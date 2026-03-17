@@ -11,6 +11,8 @@ Provides continuous location stream and geofencing.
   s.author           = { 'AutoNavi Maps Flutter' => 'dev@example.com' }
   s.source           = { :path => '.' }
   s.source_files     = 'Classes/**/*'
+  s.static_framework = true
+
   s.dependency 'Flutter'
   s.dependency 'AMapLocation', '~> 2.11'
   s.platform         = :ios, '12.0'
