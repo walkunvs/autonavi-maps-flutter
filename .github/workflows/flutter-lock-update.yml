@@ -51,10 +51,13 @@ jobs:
         run: flutter pub get
         working-directory: example
 
+      - name: Create example platform files (android + ios)
+        run: flutter create . --platforms android,ios
+        working-directory: example
+
       - name: Pod install (generates example/ios/Podfile.lock)
         run: pod install
         working-directory: example/ios
-        continue-on-error: true   # Podfile may not exist yet on brand-new projects
 
       # ── Android: resolve Gradle dependencies ────────────────────────────
       - name: Resolve Android Gradle dependencies
@@ -84,14 +87,16 @@ jobs:
             - `pubspec.lock` (root workspace)
             - `packages/*/pubspec.lock` (each package)
             - `example/pubspec.lock`
-            - `example/ios/Podfile.lock` (CocoaPods)
+            - `example/android/` (platform project files + Gradle)
+            - `example/ios/` (platform project files + Podfile.lock)
 
             > Review the dependency changes before merging.
           add-paths: |
             pubspec.lock
             packages/**/pubspec.lock
             example/pubspec.lock
-            example/ios/Podfile.lock
+            example/android
+            example/ios
           labels: |
             dependencies
             automated
