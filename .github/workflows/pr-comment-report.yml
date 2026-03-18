@@ -38,8 +38,6 @@ jobs:
             const read = (p) => { try { return fs.readFileSync(p, 'utf8').trim(); } catch { return 'skipped'; } };
             const results = {
               analyze:             read('/tmp/artifacts/job-results/analyze'),
-              android:             read('/tmp/artifacts/job-results/android'),
-              ios:                 read('/tmp/artifacts/job-results/ios'),
               integration_ios:     read('/tmp/artifacts/job-results/integration_ios'),
               integration_android: read('/tmp/artifacts/job-results/integration_android'),
             };
@@ -50,19 +48,15 @@ jobs:
             // Build comment body
             let body = `<!-- ci-build-report -->\n## CI Build Report\n\n`;
             body += `| Job | Status |\n|-----|--------|\n`;
-            body += `| Flutter Analyze                    | ${icon(results.analyze)}             ${results.analyze} |\n`;
-            body += `| Android Build                      | ${icon(results.android)}             ${results.android} |\n`;
-            body += `| iOS Build                          | ${icon(results.ios)}                 ${results.ios} |\n`;
-            body += `| Integration Tests (iOS Simulator)  | ${icon(results.integration_ios)}     ${results.integration_ios} |\n`;
+            body += `| Flutter Analyze                     | ${icon(results.analyze)}             ${results.analyze} |\n`;
+            body += `| Integration Tests (iOS Simulator)   | ${icon(results.integration_ios)}     ${results.integration_ios} |\n`;
             body += `| Integration Tests (Android Emulator)| ${icon(results.integration_android)} ${results.integration_android} |\n\n`;
 
             // Append error logs for failed jobs
             const failedJobs = [
-              { label: 'Flutter Analyze',                  status: results.analyze,             logFile: '/tmp/artifacts/log-analyze/analyze.log' },
-              { label: 'Android Build',                    status: results.android,             logFile: '/tmp/artifacts/log-android/android.log' },
-              { label: 'iOS Build',                        status: results.ios,                 logFile: '/tmp/artifacts/log-ios/ios.log' },
-              { label: 'Integration Tests (iOS)',           status: results.integration_ios,     logFile: '/tmp/artifacts/log-integration-ios/integration-ios.log' },
-              { label: 'Integration Tests (Android)',       status: results.integration_android, logFile: '/tmp/artifacts/log-integration-android/integration-android.log' },
+              { label: 'Flutter Analyze',             status: results.analyze,             logFile: '/tmp/artifacts/log-analyze/analyze.log' },
+              { label: 'Integration Tests (iOS)',      status: results.integration_ios,     logFile: '/tmp/artifacts/log-integration-ios/integration-ios.log' },
+              { label: 'Integration Tests (Android)',  status: results.integration_android, logFile: '/tmp/artifacts/log-integration-android/integration-android.log' },
             ].filter(j => j.status === 'failure');
 
             if (failedJobs.length > 0) {
