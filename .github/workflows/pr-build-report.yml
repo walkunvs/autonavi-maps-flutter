@@ -63,7 +63,9 @@ jobs:
     name: Android Build
     runs-on: ubuntu-latest
     outputs:
-      status: ${{ steps.build.outcome }}
+      # Use the explicit capture step so pre-build failures (e.g. melos
+      # bootstrap) report as "failure" rather than "skipped".
+      status: ${{ steps.capture.outputs.status }}
 
     steps:
       - uses: actions/checkout@v5
@@ -80,10 +82,13 @@ jobs:
           cache: true
 
       - name: Melos bootstrap
+        id: melos
         run: dart pub get && dart run melos bootstrap
+        continue-on-error: true
 
       - name: Build Android APK (debug)
         id: build
+        if: steps.melos.outcome == 'success'
         run: |
           flutter build apk --debug \
             --dart-define=AMAP_API_KEY=${{ secrets.AMAP_API_KEY || 'placeholder' }} \
@@ -92,6 +97,16 @@ jobs:
         env:
           AMAP_API_KEY: ${{ secrets.AMAP_API_KEY || 'placeholder' }}
         continue-on-error: true
+
+      - name: Capture job status
+        id: capture
+        if: always()
+        run: |
+          if [[ "${{ steps.melos.outcome }}" == "failure" ]]; then
+            echo "status=failure" >> $GITHUB_OUTPUT
+          else
+            echo "status=${{ steps.build.outcome }}" >> $GITHUB_OUTPUT
+          fi
 
       - uses: actions/upload-artifact@v6
         if: always()
