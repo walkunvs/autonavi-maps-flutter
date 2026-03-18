@@ -1,18 +1,10 @@
 import Flutter
-import AMapSearchKit
 
-class SearchChannelHandler: NSObject, FlutterPlugin, AMapSearchDelegate {
+class SearchChannelHandler: NSObject, FlutterPlugin {
 
-    private var searchAPI: AMapSearchAPI?
-    // Keyed by the ObjectIdentifier of each AMapSearch request object so
-    // multiple in-flight searches don't overwrite each other's result callback.
-    private var pendingResults: [ObjectIdentifier: FlutterResult] = [:]
+    private let adapter = AMapSearchAdapter()
 
-    override init() {
-        super.init()
-        searchAPI = AMapSearchAPI()
-        searchAPI?.delegate = self
-    }
+    override init() { super.init() }
 
     public static func register(with registrar: FlutterPluginRegistrar) {}
 
@@ -42,258 +34,150 @@ class SearchChannelHandler: NSObject, FlutterPlugin, AMapSearchDelegate {
     // MARK: - Search Handlers
 
     private func handleKeywordSearch(_ args: [String: Any], result: @escaping FlutterResult) {
-        let request = AMapPOIKeywordsSearchRequest()
-        request.keywords = args["keyword"] as? String ?? ""
-        request.city = args["city"] as? String ?? ""
-        request.types = args["types"] as? String
-        request.offset = args["pageSize"] as? Int ?? 20
-        request.page = args["page"] as? Int ?? 1
-        pendingResults[ObjectIdentifier(request)] = result
-        searchAPI?.aMapPOIKeywordsSearch(request)
+        adapter.searchKeyword(
+            keyword:  args["keyword"]  as? String ?? "",
+            city:     args["city"]     as? String ?? "",
+            types:    args["types"]    as? String,
+            pageSize: args["pageSize"] as? Int ?? 20,
+            page:     args["page"]     as? Int ?? 1
+        ) { page, err in
+            if let err = err { result(FlutterError(code: err.code, message: err.message, details: nil)); return }
+            result(poiPageToMap(page!))
+        }
     }
 
     private func handleNearbySearch(_ args: [String: Any], result: @escaping FlutterResult) {
-        let request = AMapPOIAroundSearchRequest()
-        request.location = AMapGeoPoint.location(
-            withLatitude: CGFloat(args["latitude"] as? Double ?? 0),
-            longitude: CGFloat(args["longitude"] as? Double ?? 0)
-        )
-        request.radius = args["radius"] as? Int ?? 1000
-        request.keywords = args["keyword"] as? String
-        request.types = args["types"] as? String
-        request.offset = args["pageSize"] as? Int ?? 20
-        request.page = args["page"] as? Int ?? 1
-        pendingResults[ObjectIdentifier(request)] = result
-        searchAPI?.aMapPOIAroundSearch(request)
+        adapter.searchNearby(
+            latitude:  args["latitude"]  as? Double ?? 0,
+            longitude: args["longitude"] as? Double ?? 0,
+            radius:    args["radius"]    as? Int ?? 1000,
+            keyword:   args["keyword"]   as? String,
+            types:     args["types"]     as? String,
+            pageSize:  args["pageSize"]  as? Int ?? 20,
+            page:      args["page"]      as? Int ?? 1
+        ) { page, err in
+            if let err = err { result(FlutterError(code: err.code, message: err.message, details: nil)); return }
+            result(poiPageToMap(page!))
+        }
     }
 
     private func handleRegeocode(_ args: [String: Any], result: @escaping FlutterResult) {
-        let request = AMapReGeocodeSearchRequest()
-        request.location = AMapGeoPoint.location(
-            withLatitude: CGFloat(args["latitude"] as? Double ?? 0),
-            longitude: CGFloat(args["longitude"] as? Double ?? 0)
-        )
-        request.radius = 200
-        request.requireExtension = true
-        pendingResults[ObjectIdentifier(request)] = result
-        searchAPI?.aMapReGoecodeSearch(request)
+        adapter.regeocode(
+            latitude:  args["latitude"]  as? Double ?? 0,
+            longitude: args["longitude"] as? Double ?? 0
+        ) { ac, err in
+            if let err = err { result(FlutterError(code: err.code, message: err.message, details: nil)); return }
+            guard let ac = ac else { result(nil); return }
+            result([
+                "formattedAddress": ac.formattedAddress, "country": ac.country,
+                "province": ac.province, "city": ac.city, "cityCode": ac.cityCode,
+                "district": ac.district, "adCode": ac.adCode, "street": ac.street,
+                "streetNumber": ac.streetNumber, "township": ac.township, "townCode": ac.townCode,
+            ] as [String: Any?])
+        }
     }
 
     private func handleGeocode(_ args: [String: Any], result: @escaping FlutterResult) {
-        let request = AMapGeocodeSearchRequest()
-        request.address = args["address"] as? String ?? ""
-        request.city = args["city"] as? String
-        pendingResults[ObjectIdentifier(request)] = result
-        searchAPI?.aMapGeocodeSearch(request)
+        adapter.geocode(
+            address: args["address"] as? String ?? "",
+            city:    args["city"]    as? String
+        ) { items, err in
+            if let err = err { result(FlutterError(code: err.code, message: err.message, details: nil)); return }
+            let maps = (items ?? []).map { gc -> [String: Any?] in
+                ["formattedAddress": gc.formattedAddress, "country": gc.country,
+                 "province": gc.province, "city": gc.city, "cityCode": gc.cityCode,
+                 "district": gc.district, "adCode": gc.adCode,
+                 "latitude": gc.latitude, "longitude": gc.longitude, "level": gc.level]
+            }
+            result(maps)
+        }
     }
 
     private func handleDrivingRoute(_ args: [String: Any], result: @escaping FlutterResult) {
         guard let originMap = args["origin"] as? [String: Any],
-              let destMap = args["destination"] as? [String: Any] else {
+              let destMap   = args["destination"] as? [String: Any] else {
             result(FlutterError(code: "INVALID_ARGS", message: "origin/destination required", details: nil))
             return
         }
-        let request = AMapDrivingCalRouteSearchRequest()
-        request.origin = AMapGeoPoint.location(
-            withLatitude: CGFloat(originMap["latitude"] as? Double ?? 0),
-            longitude: CGFloat(originMap["longitude"] as? Double ?? 0)
-        )
-        request.destination = AMapGeoPoint.location(
-            withLatitude: CGFloat(destMap["latitude"] as? Double ?? 0),
-            longitude: CGFloat(destMap["longitude"] as? Double ?? 0)
-        )
-        if let waypointsArr = args["waypoints"] as? [[String: Any]], !waypointsArr.isEmpty {
-            request.waypoints = waypointsArr.map { wp in
-                AMapGeoPoint.location(
-                    withLatitude: CGFloat(wp["latitude"] as? Double ?? 0),
-                    longitude: CGFloat(wp["longitude"] as? Double ?? 0)
-                )
-            }
+        let waypoints = (args["waypoints"] as? [[String: Any]] ?? []).map {
+            (lat: $0["latitude"] as? Double ?? 0, lng: $0["longitude"] as? Double ?? 0)
         }
-        pendingResults[ObjectIdentifier(request)] = result
-        searchAPI?.aMapDrivingV2RouteSearch(request)
+        adapter.drivingRoute(
+            originLat: originMap["latitude"] as? Double ?? 0,
+            originLng: originMap["longitude"] as? Double ?? 0,
+            destLat:   destMap["latitude"]   as? Double ?? 0,
+            destLng:   destMap["longitude"]  as? Double ?? 0,
+            waypoints: waypoints
+        ) { paths, err in
+            if let err = err { result(FlutterError(code: err.code, message: err.message, details: nil)); return }
+            result(["paths": (paths ?? []).map { routePathToMap($0) }])
+        }
     }
 
     private func handleWalkingRoute(_ args: [String: Any], result: @escaping FlutterResult) {
         guard let originMap = args["origin"] as? [String: Any],
-              let destMap = args["destination"] as? [String: Any] else {
+              let destMap   = args["destination"] as? [String: Any] else {
             result(FlutterError(code: "INVALID_ARGS", message: "origin/destination required", details: nil))
             return
         }
-        let request = AMapWalkingRouteSearchRequest()
-        request.origin = AMapGeoPoint.location(
-            withLatitude: CGFloat(originMap["latitude"] as? Double ?? 0),
-            longitude: CGFloat(originMap["longitude"] as? Double ?? 0)
-        )
-        request.destination = AMapGeoPoint.location(
-            withLatitude: CGFloat(destMap["latitude"] as? Double ?? 0),
-            longitude: CGFloat(destMap["longitude"] as? Double ?? 0)
-        )
-        pendingResults[ObjectIdentifier(request)] = result
-        searchAPI?.aMapWalkingRouteSearch(request)
+        adapter.walkingRoute(
+            originLat: originMap["latitude"] as? Double ?? 0,
+            originLng: originMap["longitude"] as? Double ?? 0,
+            destLat:   destMap["latitude"]   as? Double ?? 0,
+            destLng:   destMap["longitude"]  as? Double ?? 0
+        ) { paths, err in
+            if let err = err { result(FlutterError(code: err.code, message: err.message, details: nil)); return }
+            result(["paths": (paths ?? []).map { routePathToMap($0) }])
+        }
     }
 
     private func handleDistrictSearch(_ args: [String: Any], result: @escaping FlutterResult) {
-        let request = AMapDistrictSearchRequest()
-        request.keywords = args["keywords"] as? String ?? ""
-        request.subdistrict = args["level"] as? Int ?? 3
-        pendingResults[ObjectIdentifier(request)] = result
-        searchAPI?.aMapDistrictSearch(request)
-    }
-
-    // MARK: - AMapSearchDelegate
-
-    func onPOISearchDone(_ request: AMapPOISearchBaseRequest!, response: AMapPOISearchResponse!) {
-        guard let result = pendingResults.removeValue(forKey: ObjectIdentifier(request)) else { return }
-
-        guard response != nil else {
-            result(FlutterError(code: "SEARCH_ERROR", message: "POI search failed", details: nil))
-            return
-        }
-
-        let pois = response.pois?.map { poi -> [String: Any?] in
-            return [
-                "poiId": poi.uid,
-                "title": poi.name,
-                "typeDes": poi.type,
-                "typeCode": poi.typecode,
-                "latitude": poi.location.map { Double($0.latitude) },
-                "longitude": poi.location.map { Double($0.longitude) },
-                "address": poi.address,
-                "tel": poi.tel,
-                "distance": poi.distance,
-                "cityName": poi.city,
-                "adName": poi.district,
-                "snippet": poi.address,
-            ]
-        } ?? []
-
-        let pageSize = request.offset > 0 ? Int(request.offset) : 20
-        let pageNum = request.page > 0 ? Int(request.page) : 1
-        result([
-            "pois": pois,
-            "totalCount": response.count,
-            "pageCount": response.count > 0 ? (Int(response.count) + pageSize - 1) / pageSize : 0,
-            "pageNum": pageNum,
-        ] as [String: Any])
-    }
-
-    func onReGeocodeSearchDone(_ request: AMapReGeocodeSearchRequest!, response: AMapReGeocodeSearchResponse!) {
-        guard let result = pendingResults.removeValue(forKey: ObjectIdentifier(request)) else { return }
-
-        guard let address = response?.regeocode?.formattedAddress else {
-            result(FlutterError(code: "REGEOCODE_ERROR", message: "Regeocode failed", details: nil))
-            return
-        }
-
-        let addressComponent = response?.regeocode?.addressComponent
-        result([
-            "formattedAddress": address,
-            "country": addressComponent?.country,
-            "province": addressComponent?.province,
-            "city": addressComponent?.city,
-            "cityCode": addressComponent?.citycode,
-            "district": addressComponent?.district,
-            "adCode": addressComponent?.adcode,
-            "street": addressComponent?.streetNumber?.street,
-            "streetNumber": addressComponent?.streetNumber?.number,
-            "township": addressComponent?.township,
-            "townCode": addressComponent?.towncode,
-        ] as [String: Any?])
-    }
-
-    func onGeocodeSearchDone(_ request: AMapGeocodeSearchRequest!, response: AMapGeocodeSearchResponse!) {
-        guard let result = pendingResults.removeValue(forKey: ObjectIdentifier(request)) else { return }
-
-        let geocodes = response?.geocodes?.map { gc -> [String: Any?] in
-            return [
-                "formattedAddress": gc.formattedAddress,
-                "country": gc.country,
-                "province": gc.province,
-                "city": gc.city,
-                "cityCode": gc.citycode,
-                "district": gc.district,
-                "adCode": gc.adcode,
-                "latitude": gc.location.map { Double($0.latitude) },
-                "longitude": gc.location.map { Double($0.longitude) },
-                "level": gc.level,
-            ]
-        } ?? []
-        result(geocodes)
-    }
-
-    func onRouteSearchDone(_ request: AMapRouteSearchBaseRequest!, response: AMapRouteSearchResponse!) {
-        guard let result = pendingResults.removeValue(forKey: ObjectIdentifier(request)) else { return }
-
-        guard response != nil else {
-            result(FlutterError(code: "ROUTE_ERROR", message: "Route search failed", details: nil))
-            return
-        }
-
-        let paths = response.route?.paths?.map { path -> [String: Any] in
-            return [
-                "distance": Int(path.distance),
-                "duration": Int(path.duration),
-                "strategy": path.strategy ?? "",
-                "tolls": Double(path.tolls),
-                "tollDistance": Int(path.tollDistance),
-                "trafficLights": Int(path.totalTrafficLights),
-                "steps": path.steps?.map { step -> [String: Any?] in
-                    return [
-                        "instruction": step.instruction,
-                        "road": step.road,
-                        "distance": Int(step.distance),
-                        "duration": Int(step.duration),
-                        "action": step.action,
-                        "path": parsePolyline(step.polyline),
-                    ]
-                } ?? [],
-            ]
-        } ?? []
-        result(["paths": paths])
-    }
-
-    func aMapSearchRequest(_ request: Any!, didFailWithError error: Error!) {
-        guard let req = request as? AnyObject,
-              let result = pendingResults.removeValue(forKey: ObjectIdentifier(req)) else { return }
-        let nsError = error as NSError
-        result(FlutterError(
-            code: "SEARCH_ERROR_\(nsError.code)",
-            message: nsError.localizedDescription,
-            details: nil
-        ))
-    }
-
-    func onDistrictSearchDone(_ request: AMapDistrictSearchRequest!, response: AMapDistrictSearchResponse!) {
-        guard let result = pendingResults.removeValue(forKey: ObjectIdentifier(request)) else { return }
-
-        func convertDistrict(_ d: AMapDistrict) -> [String: Any?] {
-            return [
-                "name": d.name,
-                "adCode": d.adcode,
-                "cityCode": d.citycode,
-                "level": d.level,
-                "latitude": d.center.map { Double($0.latitude) },
-                "longitude": d.center.map { Double($0.longitude) },
-                "districts": d.districts?.map { convertDistrict($0) } ?? [],
-            ]
-        }
-
-        let items = response.districts?.map { convertDistrict($0) } ?? []
-        result(items)
-    }
-
-    // MARK: - Private Helpers
-
-    /// Parses an AMap polyline string ("lon,lat;lon,lat;...") into coordinate dictionaries.
-    private func parsePolyline(_ polyline: String?) -> [[String: Double]] {
-        guard let polyline = polyline, !polyline.isEmpty else { return [] }
-        return polyline.split(separator: ";").compactMap { seg -> [String: Double]? in
-            let parts = seg.split(separator: ",")
-            guard parts.count >= 2,
-                  let lon = Double(parts[0]),
-                  let lat = Double(parts[1]) else { return nil }
-            return ["latitude": lat, "longitude": lon]
+        adapter.searchDistrict(
+            keywords: args["keywords"] as? String ?? "",
+            level:    args["level"]    as? Int ?? 3
+        ) { items, err in
+            if let err = err { result(FlutterError(code: err.code, message: err.message, details: nil)); return }
+            result((items ?? []).map { districtToMap($0) })
         }
     }
+}
+
+// MARK: - Map conversion helpers (free functions, no SDK imports)
+
+private func poiPageToMap(_ page: AMapSearchAdapter.POIPage) -> [String: Any] {
+    return [
+        "pois": page.pois.map { poi -> [String: Any?] in
+            ["poiId": poi.poiId, "title": poi.title, "typeDes": poi.typeDes,
+             "typeCode": poi.typeCode, "latitude": poi.latitude, "longitude": poi.longitude,
+             "address": poi.address, "tel": poi.tel, "distance": poi.distance,
+             "cityName": poi.cityName, "adName": poi.adName, "snippet": poi.address]
+        },
+        "totalCount": page.totalCount,
+        "pageCount":  page.pageCount,
+        "pageNum":    page.pageNum,
+    ]
+}
+
+private func routePathToMap(_ path: AMapSearchAdapter.RoutePath) -> [String: Any] {
+    return [
+        "distance":     path.distance,
+        "duration":     path.duration,
+        "strategy":     path.strategy,
+        "tolls":        path.tolls,
+        "tollDistance": path.tollDistance,
+        "trafficLights":path.trafficLights,
+        "steps": path.steps.map { step -> [String: Any?] in
+            ["instruction": step.instruction, "road": step.road,
+             "distance": step.distance, "duration": step.duration,
+             "action": step.action, "path": step.path]
+        },
+    ]
+}
+
+private func districtToMap(_ d: AMapSearchAdapter.DistrictItem) -> [String: Any?] {
+    return [
+        "name": d.name, "adCode": d.adCode, "cityCode": d.cityCode, "level": d.level,
+        "latitude": d.latitude, "longitude": d.longitude,
+        "districts": d.districts.map { districtToMap($0) },
+    ]
 }
