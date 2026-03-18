@@ -130,8 +130,8 @@ class LocationStreamHandler: NSObject, FlutterStreamHandler, AMapLocationManager
             "streetNum": reGeocode?.number,
             "cityCode": reGeocode?.citycode,
             "adCode": reGeocode?.adcode,
-            "poiName": reGeocode?.POIName,
-            "aoiName": reGeocode?.AOIName,
+            "poiName": reGeocode?.poiName,
+            "aoiName": reGeocode?.aoiName,
         ]
     }
 }
