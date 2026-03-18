@@ -8,8 +8,8 @@ public class AutonaviLocationPlugin: NSObject, FlutterPlugin {
 
     public static func register(with registrar: FlutterPluginRegistrar) {
         // Privacy compliance
-        AMapLocationClient.updatePrivacyShow(.didShow, privacyInfo: .contain)
-        AMapLocationClient.updatePrivacyAgree(.did)
+        AMapLocationManager.updatePrivacyShow(.didShow, privacyInfo: .contain)
+        AMapLocationManager.updatePrivacyAgree(.did)
 
         let instance = AutonaviLocationPlugin()
 
