@@ -10,8 +10,13 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
+  # ───────────────────────────────────────────────────────────────────────────
+  # Analyze + unit tests — runs on every push to main/develop so that commits
+  # that land outside of a PR (e.g. direct pushes or PRs targeting develop)
+  # are still validated. pr-build-report.yml covers PRs to main only.
+  # ───────────────────────────────────────────────────────────────────────────
   analyze_and_test:
-    name: Analyze & Test
+    name: Analyze & Unit Tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -22,67 +27,24 @@ jobs:
           channel: 'stable'
           cache: true
 
-      - name: Install Melos
+      - name: Melos bootstrap
         run: dart pub get && dart run melos bootstrap
 
-      - name: Analyze
-        run: dart run melos run analyze
-
-      - name: Test (unit + channel contract)
-        run: dart run melos run test
+      - name: Flutter analyze
+        run: dart run melos exec -- "flutter analyze --no-fatal-infos"
 
       - name: Format check
-        run: dart run melos run format_check
+        run: dart run melos exec -- "dart format --set-exit-if-changed ."
 
-  android_build:
-    name: Android Build
-    runs-on: ubuntu-latest
-    needs: analyze_and_test
-    steps:
-      - uses: actions/checkout@v5
+      - name: Unit tests
+        run: dart run melos exec -- "flutter test"
 
-      - uses: actions/setup-java@v5
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-
-      - uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.27.x'
-          cache: true
-
-      - name: Install Melos
-        run: dart pub get && dart run melos bootstrap
-
-      - name: Build Android APK (example)
-        run: flutter build apk --debug --dart-define=AMAP_API_KEY=${{ secrets.AMAP_API_KEY }}
-        working-directory: example
-
-  ios_build:
-    name: iOS Build
-    runs-on: macos-latest
-    needs: analyze_and_test
-    steps:
-      - uses: actions/checkout@v5
-
-      - uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.27.x'
-          cache: true
-
-      - name: Install Melos
-        run: dart pub get && dart run melos bootstrap
-
-      - name: Pod Install
-        run: pod install
-        working-directory: example/ios
-
-      - name: Build iOS (no codesign)
-        run: flutter build ios --debug --no-codesign --dart-define=AMAP_API_KEY=${{ secrets.AMAP_API_KEY }}
-        working-directory: example
+  # Build (analyze + android/ios build) is handled by pr-build-report.yml
+  # on every PR. This workflow also runs integration tests after merge to main,
+  # avoiding duplicate work and keeping PR feedback fast.
 
   # ───────────────────────────────────────────────────────────────────────────
-  # Layer 2 + 3: iOS Simulator integration tests + golden screenshot regression
+  # iOS Simulator integration tests + golden screenshot regression
   #
   # Runs on macos-14 (Apple Silicon) because iOS Simulator requires macOS.
   # Screenshots are captured and compared against goldens in golden/.
@@ -90,7 +52,6 @@ jobs:
   integration_test_ios:
     name: Integration Tests (iOS Simulator)
     runs-on: macos-14
-    needs: analyze_and_test
     steps:
       - uses: actions/checkout@v5
 
@@ -172,14 +133,13 @@ jobs:
           SIM_UDID: ${{ env.SIM_UDID }}
 
   # ───────────────────────────────────────────────────────────────────────────
-  # Layer 4: Android Emulator integration tests
+  # Android Emulator integration tests
   #
   # Runs on ubuntu-latest with KVM hardware acceleration for Android emulator.
   # ───────────────────────────────────────────────────────────────────────────
   integration_test_android:
     name: Integration Tests (Android Emulator)
     runs-on: ubuntu-latest
-    needs: analyze_and_test
     steps:
       - uses: actions/checkout@v5
 
@@ -212,8 +172,7 @@ jobs:
           arch: x86_64
           profile: Nexus 6
           script: |
-            cd example
-            flutter test integration_test/map_rendering_test.dart \
+            cd example && flutter test integration_test/map_rendering_test.dart \
               --device-id emulator-5554 \
               --dart-define=AMAP_ANDROID_KEY=${{ secrets.AMAP_ANDROID_KEY }}
 

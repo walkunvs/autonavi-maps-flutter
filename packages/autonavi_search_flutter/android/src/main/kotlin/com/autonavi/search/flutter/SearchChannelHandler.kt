@@ -12,10 +12,9 @@ import com.amap.api.services.district.DistrictItem
 import com.amap.api.services.district.DistrictResult
 import com.amap.api.services.district.DistrictSearch
 import com.amap.api.services.district.DistrictSearchQuery
-import com.amap.api.services.poisearch.PoiItemV2
+import com.amap.api.services.core.PoiItem
 import com.amap.api.services.poisearch.PoiResult
 import com.amap.api.services.poisearch.PoiSearch
-import com.amap.api.services.poisearch.PoiSearchQuery
 import com.amap.api.services.route.DrivePath
 import com.amap.api.services.route.DriveRouteResult
 import com.amap.api.services.route.RouteSearch
@@ -74,10 +73,9 @@ class SearchChannelHandler(private val context: Context) : MethodChannel.MethodC
         val page = (args["page"] as? Int) ?: 1
         val pageSize = (args["pageSize"] as? Int) ?: 20
 
-        val query = PoiSearchQuery(keyword, types, city).apply {
-            pageNum = page - 1
-            this.pageSize = pageSize
-        }
+        val query = PoiSearch.Query(keyword, types, city)
+        query.pageNum = page - 1
+        query.pageSize = pageSize
         val search = PoiSearch(context, query)
         search.setOnPoiSearchListener(object : PoiSearch.OnPoiSearchListener {
             override fun onPoiSearched(poiResult: PoiResult?, resultCode: Int) {
@@ -87,7 +85,7 @@ class SearchChannelHandler(private val context: Context) : MethodChannel.MethodC
                     result.error("SEARCH_ERROR_$resultCode", "POI search failed", null)
                 }
             }
-            override fun onPoiItemSearched(item: PoiItemV2?, resultCode: Int) {}
+            override fun onPoiItemSearched(item: PoiItem?, resultCode: Int) {}
         })
         search.searchPOIAsyn()
     }
@@ -101,10 +99,9 @@ class SearchChannelHandler(private val context: Context) : MethodChannel.MethodC
         val page = (args["page"] as? Int) ?: 1
         val pageSize = (args["pageSize"] as? Int) ?: 20
 
-        val query = PoiSearchQuery(keyword, types, "").apply {
-            pageNum = page - 1
-            this.pageSize = pageSize
-        }
+        val query = PoiSearch.Query(keyword, types, "")
+        query.pageNum = page - 1
+        query.pageSize = pageSize
         val search = PoiSearch(context, query)
         search.bound = PoiSearch.SearchBound(LatLonPoint(lat, lng), radius)
         search.setOnPoiSearchListener(object : PoiSearch.OnPoiSearchListener {
@@ -115,7 +112,7 @@ class SearchChannelHandler(private val context: Context) : MethodChannel.MethodC
                     result.error("SEARCH_ERROR_$resultCode", "Nearby search failed", null)
                 }
             }
-            override fun onPoiItemSearched(item: PoiItemV2?, resultCode: Int) {}
+            override fun onPoiItemSearched(item: PoiItem?, resultCode: Int) {}
         })
         search.searchPOIAsyn()
     }
@@ -125,7 +122,7 @@ class SearchChannelHandler(private val context: Context) : MethodChannel.MethodC
         val lng = (args["longitude"] as Number).toDouble()
         val search = GeocodeSearch(context)
         val query = RegeocodeQuery(LatLonPoint(lat, lng), 200f, GeocodeSearch.AMAP)
-        search.setOnGeocodeSearchListener(object : GeocodeSearch.OnGeocodeAndReGeocodeSearchListener {
+        search.setOnGeocodeSearchListener(object : GeocodeSearch.OnGeocodeSearchListener {
             override fun onRegeocodeSearched(geocodeResult: RegeocodeResult?, resultCode: Int) {
                 if (resultCode == 1000 && geocodeResult != null) {
                     val address = geocodeResult.regeocodeAddress
@@ -140,7 +137,7 @@ class SearchChannelHandler(private val context: Context) : MethodChannel.MethodC
                         "street" to address.streetNumber?.street,
                         "streetNumber" to address.streetNumber?.number,
                         "township" to address.township,
-                        "townCode" to address.townCode,
+                        "townCode" to address.towncode,
                     ))
                 } else {
                     result.error("REGEOCODE_ERROR_$resultCode", "Regeocode failed", null)
@@ -156,7 +153,7 @@ class SearchChannelHandler(private val context: Context) : MethodChannel.MethodC
         val city = args["city"] as? String ?: ""
         val search = GeocodeSearch(context)
         val query = GeocodeQuery(address, city)
-        search.setOnGeocodeSearchListener(object : GeocodeSearch.OnGeocodeAndReGeocodeSearchListener {
+        search.setOnGeocodeSearchListener(object : GeocodeSearch.OnGeocodeSearchListener {
             override fun onRegeocodeSearched(geocodeResult: RegeocodeResult?, resultCode: Int) {}
             override fun onGeocodeSearched(geocodeResult: GeocodeResult?, resultCode: Int) {
                 if (resultCode == 1000 && geocodeResult != null) {
@@ -166,9 +163,8 @@ class SearchChannelHandler(private val context: Context) : MethodChannel.MethodC
                             "country" to addr.country,
                             "province" to addr.province,
                             "city" to addr.city,
-                            "cityCode" to addr.cityCode,
                             "district" to addr.district,
-                            "adCode" to addr.adCode,
+                            "adCode" to addr.adcode,
                             "latitude" to addr.latLonPoint?.latitude,
                             "longitude" to addr.latLonPoint?.longitude,
                             "level" to addr.level,
@@ -199,7 +195,7 @@ class SearchChannelHandler(private val context: Context) : MethodChannel.MethodC
 
         val search = RouteSearch(context)
         val fromAndTo = RouteSearch.FromAndTo(origin, dest)
-        val query = RouteSearch.DriveRouteQuery(fromAndTo, RouteSearch.DRIVING_DEFAULT, null, null, "")
+        val query = RouteSearch.DriveRouteQuery(fromAndTo, RouteSearch.DrivingDefault, null, null, "")
         search.setRouteSearchListener(object : RouteSearch.OnRouteSearchListener {
             override fun onDriveRouteSearched(routeResult: DriveRouteResult?, resultCode: Int) {
                 if (resultCode == 1000 && routeResult != null) {
@@ -211,7 +207,7 @@ class SearchChannelHandler(private val context: Context) : MethodChannel.MethodC
                                 "strategy" to path.strategy,
                                 "tolls" to path.tolls.toDouble(),
                                 "tollDistance" to path.tollDistance.toDouble(),
-                                "trafficLights" to path.trafficLights,
+                                "trafficLights" to path.totalTrafficlights,
                                 "steps" to path.steps.map { step ->
                                     mapOf(
                                         "instruction" to step.instruction,
@@ -293,10 +289,9 @@ class SearchChannelHandler(private val context: Context) : MethodChannel.MethodC
         val keywords = args["keywords"] as String
         val level = (args["level"] as? Int) ?: 3
         val search = DistrictSearch(context)
-        val query = DistrictSearchQuery().apply {
-            keywords = keywords
-            showBoundary = false
-        }
+        val query = DistrictSearchQuery()
+        query.keywords = keywords
+        search.query = query
         search.setOnDistrictSearchListener(object : DistrictSearch.OnDistrictSearchListener {
             override fun onDistrictSearched(districtResult: DistrictResult?) {
                 val items = districtResult?.district?.firstOrNull()?.subDistrict
@@ -304,18 +299,18 @@ class SearchChannelHandler(private val context: Context) : MethodChannel.MethodC
                 result.success(items)
             }
         })
-        search.searchDistrictAsyn(query)
+        search.searchDistrictAsyn()
     }
 
     private fun convertDistrictItem(item: DistrictItem): Map<String, Any?> {
-        val center = item.center?.split(",")
+        val center = item.center
         return mapOf(
             "name" to item.name,
-            "adCode" to item.adCode,
+            "adCode" to item.adcode,
             "cityCode" to item.citycode,
             "level" to item.level,
-            "latitude" to center?.getOrNull(1)?.toDoubleOrNull(),
-            "longitude" to center?.getOrNull(0)?.toDoubleOrNull(),
+            "latitude" to center?.latitude,
+            "longitude" to center?.longitude,
             "districts" to (item.subDistrict?.map { convertDistrictItem(it) } ?: emptyList<Map<String, Any?>>()),
         )
     }
@@ -329,7 +324,7 @@ class SearchChannelHandler(private val context: Context) : MethodChannel.MethodC
                 "typeCode" to poi.typeCode,
                 "latitude" to poi.latLonPoint?.latitude,
                 "longitude" to poi.latLonPoint?.longitude,
-                "address" to poi.address,
+                "address" to poi.snippet,
                 "tel" to poi.tel,
                 "distance" to poi.distance.toDouble(),
                 "cityName" to poi.cityName,
@@ -337,8 +332,8 @@ class SearchChannelHandler(private val context: Context) : MethodChannel.MethodC
                 "snippet" to poi.snippet,
             )
         },
-        "totalCount" to poiResult.totalPageNumber * poiResult.pageSize,
-        "pageCount" to poiResult.totalPageNumber,
+        "totalCount" to (poiResult.query?.pageSize?.let { it * poiResult.pageCount } ?: 0),
+        "pageCount" to poiResult.pageCount,
         "pageNum" to page,
     )
 }

@@ -64,6 +64,9 @@ Thumbs.db
 .env
 *.env.local
 
+# Melos-generated local dependency overrides
+pubspec_overrides.yaml
+
 # Integration test outputs (actual screenshots, diffs)
 # Golden baselines in golden/ ARE committed.
 example/integration_test/screenshots/*.png

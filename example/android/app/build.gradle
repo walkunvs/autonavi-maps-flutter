@@ -28,6 +28,7 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        manifestPlaceholders["AMAP_API_KEY"] = System.getenv("AMAP_API_KEY") ?: "placeholder"
     }
 
     buildTypes {
@@ -41,4 +42,11 @@ android {
 
 flutter {
     source = "../.."
+}
+
+// AMap 3dmap SDK bundles location SDK classes internally. Exclude the
+// standalone location artifact to prevent duplicate class errors when
+// autonavi_location_flutter also declares location as a dependency.
+configurations.all {
+    exclude group: 'com.amap.api', module: 'location'
 }

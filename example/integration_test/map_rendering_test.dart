@@ -25,10 +25,6 @@ import 'test_app/map_test_app.dart';
 // How long to wait for the map tiles and SDK to fully render after pump.
 const _mapSettleTimeout = Duration(seconds: 5);
 
-// Pixel-difference threshold passed to the CI golden_diff.py script.
-// Stored here as documentation; the CI script receives it as a CLI argument.
-const _goldenThresholdPercent = 2.0; // 2 %
-
 void main() {
   final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
@@ -280,11 +276,15 @@ void main() {
       screenshotsDir.createSync(recursive: true);
     }
 
-    // IntegrationTestWidgetsFlutterBinding.takeScreenshot stores screenshots
-    // in memory; write them out to disk here.
-    for (final entry in binding.screenshotData.entries) {
-      final file = File('${screenshotsDir.path}/${entry.key}.png');
-      file.writeAsBytesSync(entry.value);
+    // takeScreenshot stores screenshots in reportData['screenshots'] as
+    // List<Map<String,dynamic>> with keys 'screenshotName' and 'bytes'.
+    final screenshots =
+        binding.reportData?['screenshots'] as List<dynamic>?;
+    for (final entry in screenshots ?? []) {
+      final screenshot = entry as Map<String, dynamic>;
+      final file = File(
+          '${screenshotsDir.path}/${screenshot['screenshotName']}.png');
+      file.writeAsBytesSync(screenshot['bytes'] as List<int>);
     }
   });
 }

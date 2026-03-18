@@ -2,13 +2,11 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
-import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
 import 'autonavi_controller.dart';
 import 'types/camera_position.dart';
-import 'types/camera_update.dart';
 import 'types/circle.dart';
 import 'types/latlng.dart';
 import 'types/map_type.dart';
@@ -131,13 +129,9 @@ class _AutonaviWidgetState extends State<AutonaviWidget> {
   late MethodChannel _methodChannel;
   AutonaviController? _controller;
 
-  static int _nextMapId = 0;
-  late final int _mapId;
-
   @override
   void initState() {
     super.initState();
-    _mapId = _nextMapId++;
   }
 
   @override

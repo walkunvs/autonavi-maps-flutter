@@ -41,9 +41,9 @@ object Convert {
         options.position(toLatLng(json["position"] as Map<*, *>))
         options.alpha((json["alpha"] as? Number)?.toFloat() ?: 1f)
         options.draggable(json["draggable"] as? Boolean ?: false)
-        options.flat(json["flat"] as? Boolean ?: false)
         options.visible(json["visible"] as? Boolean ?: true)
         options.zIndex((json["zIndex"] as? Number)?.toFloat() ?: 0f)
+        options.setFlat(json["flat"] as? Boolean ?: false)
 
         val iconJson = json["icon"] as? Map<*, *>
         if (iconJson != null) {

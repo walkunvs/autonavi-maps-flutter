@@ -49,7 +49,7 @@ jobs:
 
       - name: Flutter Analyze
         id: analyze
-        run: dart run melos run analyze 2>&1 | tee /tmp/analyze.log; exit ${PIPESTATUS[0]}
+        run: dart run melos exec -- "flutter analyze --no-fatal-infos" 2>&1 | tee /tmp/analyze.log; exit ${PIPESTATUS[0]}
         continue-on-error: true
 
       - uses: actions/upload-artifact@v6
@@ -89,6 +89,8 @@ jobs:
             --dart-define=AMAP_API_KEY=${{ secrets.AMAP_API_KEY || 'placeholder' }} \
             2>&1 | tee /tmp/android.log; exit ${PIPESTATUS[0]}
         working-directory: example
+        env:
+          AMAP_API_KEY: ${{ secrets.AMAP_API_KEY || 'placeholder' }}
         continue-on-error: true
 
       - uses: actions/upload-artifact@v6
@@ -139,174 +141,9 @@ jobs:
           name: log-ios
           path: /tmp/ios.log
 
-  # ── 4. iOS Simulator Integration Tests + Golden Regression ────────────────
-  integration-test-ios:
-    name: Integration Tests (iOS Simulator)
-    runs-on: macos-14
-    outputs:
-      status: ${{ steps.integration.outcome }}
-
-    steps:
-      - uses: actions/checkout@v5
-
-      - uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.27.x'
-          channel: 'stable'
-          cache: true
-
-      - name: Melos bootstrap
-        run: dart pub get && dart run melos bootstrap
-
-      - name: Flutter pub get in example
-        run: flutter pub get
-        working-directory: example
-
-      - name: Pod install
-        run: pod install
-        working-directory: example/ios
-
-      - name: Create and boot iOS Simulator
-        run: |
-          RUNTIME=$(xcrun simctl list runtimes --json \
-            | python3 -c "
-          import sys, json
-          runtimes = json.load(sys.stdin)['runtimes']
-          ios = [r for r in runtimes if r.get('isAvailable') and 'iOS' in r.get('name','')]
-          print(ios[-1]['identifier'] if ios else '')
-          ")
-          if [ -z "$RUNTIME" ]; then
-            echo "No available iOS runtime found" && exit 1
-          fi
-          UDID=$(xcrun simctl create "PRTestDevice" "iPhone 15" "$RUNTIME")
-          xcrun simctl boot "$UDID"
-          xcrun simctl bootstatus "$UDID" -b
-          echo "SIM_UDID=$UDID" >> "$GITHUB_ENV"
-
-      - name: Run integration tests
-        id: integration
-        run: |
-          flutter test integration_test/map_rendering_test.dart \
-            --device-id "$SIM_UDID" \
-            --dart-define=AMAP_IOS_KEY=${{ secrets.AMAP_IOS_KEY }} \
-            2>&1 | tee /tmp/integration-ios.log; exit ${PIPESTATUS[0]}
-        working-directory: example
-        env:
-          SIM_UDID: ${{ env.SIM_UDID }}
-        continue-on-error: true
-
-      - name: Compare screenshots against goldens
-        if: always()
-        run: |
-          pip install pillow --break-system-packages
-          python scripts/golden_diff.py \
-            example/integration_test/golden \
-            example/integration_test/screenshots \
-            --threshold 2.0 \
-            --diff-dir example/integration_test/diffs \
-            2>&1 | tee /tmp/golden-ios.log || true
-
-      - name: Upload screenshots + diffs
-        uses: actions/upload-artifact@v6
-        if: always()
-        with:
-          name: ios-screenshots
-          path: |
-            example/integration_test/screenshots/
-            example/integration_test/diffs/
-          if-no-files-found: warn
-
-      - uses: actions/upload-artifact@v6
-        if: always()
-        with:
-          name: log-integration-ios
-          path: /tmp/integration-ios.log
-
-      - name: Shutdown simulator
-        if: always()
-        run: |
-          if [ -n "$SIM_UDID" ]; then
-            xcrun simctl shutdown "$SIM_UDID" || true
-            xcrun simctl delete "$SIM_UDID" || true
-          fi
-        env:
-          SIM_UDID: ${{ env.SIM_UDID }}
-
-  # ── 5. Android Emulator Integration Tests ─────────────────────────────────
-  integration-test-android:
-    name: Integration Tests (Android Emulator)
-    runs-on: ubuntu-latest
-    outputs:
-      status: ${{ steps.integration.outcome }}
-
-    steps:
-      - uses: actions/checkout@v5
-
-      - uses: actions/setup-java@v5
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-
-      - uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.27.x'
-          channel: 'stable'
-          cache: true
-
-      - name: Melos bootstrap
-        run: dart pub get && dart run melos bootstrap
-
-      - name: Enable KVM hardware acceleration
-        run: |
-          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
-            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
-          sudo udevadm control --reload-rules
-          sudo udevadm trigger --name-match=kvm
-
-      - name: Run integration tests on Android Emulator
-        id: integration
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 33
-          target: google_apis
-          arch: x86_64
-          profile: Nexus 6
-          script: |
-            cd example
-            flutter test integration_test/map_rendering_test.dart \
-              --device-id emulator-5554 \
-              --dart-define=AMAP_ANDROID_KEY=${{ secrets.AMAP_ANDROID_KEY }} \
-              2>&1 | tee /tmp/integration-android.log; exit ${PIPESTATUS[0]}
-        continue-on-error: true
-
-      - name: Compare screenshots against goldens
-        if: always()
-        run: |
-          pip install pillow --break-system-packages
-          python scripts/golden_diff.py \
-            example/integration_test/golden \
-            example/integration_test/screenshots \
-            --threshold 2.0 \
-            --diff-dir example/integration_test/diffs \
-            2>&1 | tee /tmp/golden-android.log || true
-
-      - name: Upload screenshots + diffs
-        uses: actions/upload-artifact@v6
-        if: always()
-        with:
-          name: android-screenshots
-          path: |
-            example/integration_test/screenshots/
-            example/integration_test/diffs/
-          if-no-files-found: warn
-
-      - uses: actions/upload-artifact@v6
-        if: always()
-        with:
-          name: log-integration-android
-          path: /tmp/integration-android.log
-
-  # ── 6. Save job results as artifact for comment workflow ──────────────────
+  # ── 4. Save job results as artifact for comment workflow ──────────────────
+  # Integration tests are skipped on PRs and only run after merge to main (ci.yml).
+  # The comment workflow handles missing result files gracefully (shows ⏭️ skipped).
   save-results:
     name: Save Results
     runs-on: ubuntu-latest
@@ -314,18 +151,14 @@ jobs:
       - analyze
       - android-build
       - ios-build
-      - integration-test-ios
-      - integration-test-android
     if: always()
     steps:
       - name: Write job results
         run: |
           mkdir -p /tmp/results
-          echo "${{ needs.analyze.outputs.status }}"                  > /tmp/results/analyze
-          echo "${{ needs.android-build.outputs.status }}"            > /tmp/results/android
-          echo "${{ needs.ios-build.outputs.status }}"                > /tmp/results/ios
-          echo "${{ needs.integration-test-ios.outputs.status }}"     > /tmp/results/integration_ios
-          echo "${{ needs.integration-test-android.outputs.status }}" > /tmp/results/integration_android
+          echo "${{ needs.analyze.outputs.status }}"       > /tmp/results/analyze
+          echo "${{ needs.android-build.outputs.status }}" > /tmp/results/android
+          echo "${{ needs.ios-build.outputs.status }}"     > /tmp/results/ios
       - uses: actions/upload-artifact@v6
         with:
           name: job-results
