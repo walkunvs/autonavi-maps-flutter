@@ -134,7 +134,7 @@ class AMapController: NSObject, FlutterPlatformView, MAMapViewDelegate {
         case "markers#isInfoWindowShown":
             let markerId = (args as? [String: Any])?["markerId"] as? String
             let isShown = markerId.flatMap { markers[$0] }.map { annotation in
-                mapView.selectedAnnotations.contains { $0 === annotation }
+                mapView.selectedAnnotations.contains { ($0 as AnyObject) === annotation }
             } ?? false
             result(isShown)
 

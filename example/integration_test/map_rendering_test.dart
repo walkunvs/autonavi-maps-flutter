@@ -25,12 +25,9 @@ import 'test_app/map_test_app.dart';
 // How long to wait for the map tiles and SDK to fully render after pump.
 const _mapSettleTimeout = Duration(seconds: 5);
 
-// Pixel-difference threshold passed to the CI golden_diff.py script.
-// Stored here as documentation; the CI script receives it as a CLI argument.
-const _goldenThresholdPercent = 2.0; // 2 %
-
 void main() {
-  final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+  final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized()
+      as IntegrationTestWidgetsFlutterBinding;
 
   // ─────────────────────────────────────────────────────────────────────────
   // Basic map rendering

@@ -80,7 +80,6 @@ class LocationStreamHandler(private val context: Context) : EventChannel.StreamH
             locationMode = mode
             isNeedAddress = options["needAddress"] as? Boolean ?: true
             interval = (options["intervalMs"] as? Int)?.toLong() ?: 2000L
-            smallestDisplacement = (options["distanceFilter"] as? Number)?.toFloat() ?: 0f
             isOnceLocation = options["onceLocation"] as? Boolean ?: false
         }
     }

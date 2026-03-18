@@ -2,7 +2,6 @@ package com.autonavi.maps.flutter
 
 import android.content.Context
 import com.amap.api.maps.MapsInitializer
-import com.amap.api.services.core.ServiceSettings
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
