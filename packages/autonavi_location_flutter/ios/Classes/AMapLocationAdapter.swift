@@ -10,6 +10,9 @@ struct LocationOptions {
 /// Result returned from a successful location update. All SDK types are hidden.
 typealias LocationResult = [String: Any?]
 
+/// Error info returned on location failure. Named tuple — callers access .code and .message.
+typealias LocationError = (code: String, message: String)
+
 /// Adapter that isolates all AMapLocationKit calls.
 /// When upgrading the AMap Location SDK, only this file needs changes.
 class AMapLocationAdapter: NSObject, AMapLocationManagerDelegate {
@@ -17,13 +20,13 @@ class AMapLocationAdapter: NSObject, AMapLocationManagerDelegate {
     // MARK: - Callbacks (set by caller, no SDK types in signatures)
 
     var onLocation: ((LocationResult) -> Void)?
-    var onError: ((code: String, message: String) -> Void)?
+    var onError: ((LocationError) -> Void)?
 
     // MARK: - Private
 
     private var manager: AMapLocationManager?
     private var isOnce = false
-    private var onceCallback: ((LocationResult?, (code: String, message: String)?) -> Void)?
+    private var onceCallback: ((LocationResult?, LocationError?) -> Void)?
 
     // MARK: - Public API
 
