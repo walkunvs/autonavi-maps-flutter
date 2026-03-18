@@ -12,8 +12,6 @@
 // Updating golden baselines:
 //   Copy the screenshots/ output into golden/ after a visual inspection.
 
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
@@ -263,28 +261,4 @@ void main() {
     await binding.takeScreenshot('marker_update_after');
   });
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // Save screenshots for golden comparison
-  //
-  // After all tests, copy captured screenshots to the screenshots/ directory
-  // so that the CI golden_diff.py script can compare them against golden/.
-  // ─────────────────────────────────────────────────────────────────────────
-
-  tearDownAll(() async {
-    final screenshotsDir = Directory('integration_test/screenshots');
-    if (!screenshotsDir.existsSync()) {
-      screenshotsDir.createSync(recursive: true);
-    }
-
-    // takeScreenshot stores screenshots in reportData['screenshots'] as
-    // List<Map<String,dynamic>> with keys 'screenshotName' and 'bytes'.
-    final screenshots =
-        binding.reportData?['screenshots'] as List<dynamic>?;
-    for (final entry in screenshots ?? []) {
-      final screenshot = entry as Map<String, dynamic>;
-      final file = File(
-          '${screenshotsDir.path}/${screenshot['screenshotName']}.png');
-      file.writeAsBytesSync(screenshot['bytes'] as List<int>);
-    }
-  });
 }
