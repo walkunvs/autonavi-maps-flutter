@@ -43,3 +43,10 @@ android {
 flutter {
     source = "../.."
 }
+
+// AMap 3dmap SDK bundles location SDK classes internally. Exclude the
+// standalone location artifact to prevent duplicate class errors when
+// autonavi_location_flutter also declares location as a dependency.
+configurations.all {
+    exclude group: 'com.amap.api', module: 'location'
+}

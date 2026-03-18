@@ -12,7 +12,7 @@ import com.amap.api.services.district.DistrictItem
 import com.amap.api.services.district.DistrictResult
 import com.amap.api.services.district.DistrictSearch
 import com.amap.api.services.district.DistrictSearchQuery
-import com.amap.api.services.poisearch.PoiItem
+import com.amap.api.services.core.PoiItem
 import com.amap.api.services.poisearch.PoiResult
 import com.amap.api.services.poisearch.PoiSearch
 import com.amap.api.services.route.DrivePath
@@ -162,9 +162,8 @@ class SearchChannelHandler(private val context: Context) : MethodChannel.MethodC
                             "country" to addr.country,
                             "province" to addr.province,
                             "city" to addr.city,
-                            "cityCode" to addr.cityCode,
                             "district" to addr.district,
-                            "adCode" to addr.adCode,
+                            "adCode" to addr.adcode,
                             "latitude" to addr.latLonPoint?.latitude,
                             "longitude" to addr.latLonPoint?.longitude,
                             "level" to addr.level,
@@ -323,7 +322,7 @@ class SearchChannelHandler(private val context: Context) : MethodChannel.MethodC
                 "typeCode" to poi.typeCode,
                 "latitude" to poi.latLonPoint?.latitude,
                 "longitude" to poi.latLonPoint?.longitude,
-                "address" to poi.address,
+                "address" to poi.snippet,
                 "tel" to poi.tel,
                 "distance" to poi.distance.toDouble(),
                 "cityName" to poi.cityName,
@@ -331,7 +330,7 @@ class SearchChannelHandler(private val context: Context) : MethodChannel.MethodC
                 "snippet" to poi.snippet,
             )
         },
-        "totalCount" to poiResult.query?.pageSize?.let { it * poiResult.pageCount } ?: 0,
+        "totalCount" to (poiResult.query?.pageSize?.let { it * poiResult.pageCount } ?: 0),
         "pageCount" to poiResult.pageCount,
         "pageNum" to page,
     )

@@ -116,14 +116,14 @@ class AMapController(
                 result.success(mapOf("x" to point.x, "y" to point.y))
             }
             "map#takeSnapshot" -> {
-                aMap.getMapScreenShot(AMap.OnMapScreenShotListener { bitmap ->
-                    if (bitmap == null) {
-                        result.success(null)
-                        return@OnMapScreenShotListener
+                aMap.getMapScreenShot(object : AMap.OnMapScreenShotListener {
+                    override fun onMapScreenShot(bitmap: android.graphics.Bitmap?) {
+                        if (bitmap == null) { result.success(null); return }
+                        val stream = java.io.ByteArrayOutputStream()
+                        bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, stream)
+                        result.success(stream.toByteArray())
                     }
-                    val stream = java.io.ByteArrayOutputStream()
-                    bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, stream)
-                    result.success(stream.toByteArray())
+                    override fun onMapScreenShot(bitmap: android.graphics.Bitmap?, status: Int) {}
                 })
             }
             "markers#update" -> {

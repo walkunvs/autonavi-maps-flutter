@@ -26,5 +26,9 @@ android {
 }
 
 dependencies {
-    implementation 'com.amap.api:search:9.7.1'
+    // search-9.7.1-stripped.jar is search-9.7.1 with com.amap.apis.utils.*,
+    // com.amap.api.location.*, and com.amap.api.fence.* removed to avoid
+    // duplicate class conflicts with 3dmap-10.0.600 and location-6.5.1 which
+    // bundle identical copies of those classes.
+    implementation fileTree(dir: 'libs', include: ['*.jar'])
 }
