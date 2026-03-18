@@ -157,7 +157,7 @@ class SearchChannelHandler(private val context: Context) : MethodChannel.MethodC
         "strategy"     to path.strategy,
         "tolls"        to path.tolls,
         "tollDistance" to path.tollDistance,
-        "trafficLights"to path.trafficLights,
+        "trafficLights" to path.trafficLights,
         "steps" to path.steps.map { step ->
             mapOf(
                 "instruction" to step.instruction, "road"     to step.road,
