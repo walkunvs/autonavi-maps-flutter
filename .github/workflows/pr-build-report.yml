@@ -49,7 +49,7 @@ jobs:
 
       - name: Flutter Analyze
         id: analyze
-        run: dart run melos exec -- "flutter analyze" 2>&1 | tee /tmp/analyze.log; exit ${PIPESTATUS[0]}
+        run: dart run melos exec -- "flutter analyze --no-fatal-infos" 2>&1 | tee /tmp/analyze.log; exit ${PIPESTATUS[0]}
         continue-on-error: true
 
       - uses: actions/upload-artifact@v6

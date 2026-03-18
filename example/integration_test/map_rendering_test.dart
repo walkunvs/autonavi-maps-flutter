@@ -26,8 +26,7 @@ import 'test_app/map_test_app.dart';
 const _mapSettleTimeout = Duration(seconds: 5);
 
 void main() {
-  final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized()
-      as IntegrationTestWidgetsFlutterBinding;
+  final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
   // ─────────────────────────────────────────────────────────────────────────
   // Basic map rendering
@@ -277,11 +276,15 @@ void main() {
       screenshotsDir.createSync(recursive: true);
     }
 
-    // IntegrationTestWidgetsFlutterBinding.takeScreenshot stores screenshots
-    // in memory; write them out to disk here.
-    for (final entry in binding.screenshotData.entries) {
-      final file = File('${screenshotsDir.path}/${entry.key}.png');
-      file.writeAsBytesSync(entry.value);
+    // takeScreenshot stores screenshots in reportData['screenshots'] as
+    // List<Map<String,dynamic>> with keys 'screenshotName' and 'bytes'.
+    final screenshots =
+        binding.reportData?['screenshots'] as List<dynamic>?;
+    for (final entry in screenshots ?? []) {
+      final screenshot = entry as Map<String, dynamic>;
+      final file = File(
+          '${screenshotsDir.path}/${screenshot['screenshotName']}.png');
+      file.writeAsBytesSync(screenshot['bytes'] as List<int>);
     }
   });
 }
