@@ -16,7 +16,7 @@ Provides POI search, geocoding, and route planning.
   s.dependency 'Flutter'
   # Pinned to exact version — upgrade intentionally and review the official changelog first.
   # Changelog: https://lbs.amap.com/api/ios-sdk/guide/create-project/cocoapods
-  s.dependency 'AMapSearch', '9.7.1'
+  s.dependency 'AMapSearch', '9.7.4'
   s.platform         = :ios, '12.0'
 
   s.pod_target_xcconfig = { 'DEFINES_MODULE' => 'YES', 'EXCLUDED_ARCHS[sdk=iphonesimulator*]' => 'i386' }

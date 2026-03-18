@@ -16,7 +16,7 @@ Provides continuous location stream and geofencing.
   s.dependency 'Flutter'
   # Pinned to exact version — upgrade intentionally and review the official changelog first.
   # Changelog: https://lbs.amap.com/api/ios-location-sdk/guide/create-project/cocoapods
-  s.dependency 'AMapLocation', '2.11.0'
+  s.dependency 'AMapLocation', '2.9.0'
   s.platform         = :ios, '12.0'
 
   s.pod_target_xcconfig = { 'DEFINES_MODULE' => 'YES', 'EXCLUDED_ARCHS[sdk=iphonesimulator*]' => 'i386' }
