@@ -137,6 +137,7 @@ class SearchChannelHandler(private val context: Context) : MethodChannel.MethodC
                         "street" to address.streetNumber?.street,
                         "streetNumber" to address.streetNumber?.number,
                         "township" to address.township,
+                        "townCode" to address.towncode,
                     ))
                 } else {
                     result.error("REGEOCODE_ERROR_$resultCode", "Regeocode failed", null)
@@ -194,7 +195,7 @@ class SearchChannelHandler(private val context: Context) : MethodChannel.MethodC
 
         val search = RouteSearch(context)
         val fromAndTo = RouteSearch.FromAndTo(origin, dest)
-        val query = RouteSearch.DriveRouteQuery(fromAndTo, 10, null, null, "")
+        val query = RouteSearch.DriveRouteQuery(fromAndTo, RouteSearch.DrivingDefault, null, null, "")
         search.setRouteSearchListener(object : RouteSearch.OnRouteSearchListener {
             override fun onDriveRouteSearched(routeResult: DriveRouteResult?, resultCode: Int) {
                 if (resultCode == 1000 && routeResult != null) {
@@ -206,6 +207,7 @@ class SearchChannelHandler(private val context: Context) : MethodChannel.MethodC
                                 "strategy" to path.strategy,
                                 "tolls" to path.tolls.toDouble(),
                                 "tollDistance" to path.tollDistance.toDouble(),
+                                "trafficLights" to path.totalTrafficlights,
                                 "steps" to path.steps.map { step ->
                                     mapOf(
                                         "instruction" to step.instruction,

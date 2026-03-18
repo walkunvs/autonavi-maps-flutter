@@ -10,8 +10,37 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
-  # Build (analyze + unit tests + android/ios build) is handled by pr-build-report.yml
-  # on every PR. This workflow only runs integration tests after merge to main,
+  # ───────────────────────────────────────────────────────────────────────────
+  # Analyze + unit tests — runs on every push to main/develop so that commits
+  # that land outside of a PR (e.g. direct pushes or PRs targeting develop)
+  # are still validated. pr-build-report.yml covers PRs to main only.
+  # ───────────────────────────────────────────────────────────────────────────
+  analyze_and_test:
+    name: Analyze & Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.27.x'
+          channel: 'stable'
+          cache: true
+
+      - name: Melos bootstrap
+        run: dart pub get && dart run melos bootstrap
+
+      - name: Flutter analyze
+        run: dart run melos exec -- "flutter analyze --no-fatal-infos"
+
+      - name: Format check
+        run: dart run melos exec -- "dart format --set-exit-if-changed ."
+
+      - name: Unit tests
+        run: dart run melos exec -- "flutter test"
+
+  # Build (analyze + android/ios build) is handled by pr-build-report.yml
+  # on every PR. This workflow also runs integration tests after merge to main,
   # avoiding duplicate work and keeping PR feedback fast.
 
   # ───────────────────────────────────────────────────────────────────────────
