@@ -73,10 +73,10 @@ class AMapSDKAdapter(context: Context) :
 
     // MARK: - Projection
 
-    fun latLng(fromScreen x: Int, y: Int): Map<String, Any> =
+    fun latLng(x: Int, y: Int): Map<String, Any> =
         Convert.fromLatLng(aMap.projection.fromScreenLocation(android.graphics.Point(x, y)))
 
-    fun screenCoordinate(forLatLng json: Map<*, *>): Map<String, Int> {
+    fun screenCoordinate(json: Map<*, *>): Map<String, Int> {
         val pt = aMap.projection.toScreenLocation(Convert.toLatLng(json))
         return mapOf("x" to pt.x, "y" to pt.y)
     }

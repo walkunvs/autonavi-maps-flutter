@@ -15,14 +15,14 @@ data class LocationOptions(
     val distanceFilter: Float = 0f,
 )
 
+// Top-level typealias — Kotlin does not allow typealias inside class bodies.
+typealias LocationResult = Map<String, Any?>
+
 /**
  * Adapter that isolates all AMapLocationClient calls.
  * When upgrading the AMap Location SDK, only this file needs changes.
  */
 class AMapLocationAdapter(private val context: Context) {
-
-    // Result type alias (no SDK types exposed)
-    typealias LocationResult = Map<String, Any?>
 
     // Callbacks set by caller
     var onLocation: ((LocationResult) -> Unit)? = null

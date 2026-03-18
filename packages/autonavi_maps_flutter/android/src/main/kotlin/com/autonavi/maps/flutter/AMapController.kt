@@ -82,13 +82,13 @@ class AMapController(
                 @Suppress("UNCHECKED_CAST")
                 val args = call.arguments as Map<*, *>
                 result.success(adapter.latLng(
-                    fromScreen = (args["x"] as Number).toInt(),
+                    x = (args["x"] as Number).toInt(),
                     y = (args["y"] as Number).toInt()
                 ))
             }
             "map#getScreenCoordinate" -> {
                 @Suppress("UNCHECKED_CAST")
-                result.success(adapter.screenCoordinate(forLatLng = call.arguments as Map<*, *>))
+                result.success(adapter.screenCoordinate(json = call.arguments as Map<*, *>))
             }
             "map#takeSnapshot" -> {
                 adapter.takeSnapshot { bytes -> result.success(bytes) }

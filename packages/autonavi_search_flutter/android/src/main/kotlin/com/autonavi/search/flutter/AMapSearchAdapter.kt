@@ -66,17 +66,12 @@ class AMapSearchAdapter(private val context: Context) {
         val latitude: Double?, val longitude: Double?, val districts: List<DistrictNode>,
     )
 
-    typealias POICallback      = (POIPage?, error: Pair<String, String?>?) -> Unit
-    typealias RegeocodeCallback= (AddressComponent?, error: Pair<String, String?>?) -> Unit
-    typealias GeocodeCallback  = (List<GeocodeItem>?, error: Pair<String, String?>?) -> Unit
-    typealias RouteCallback    = (List<RoutePath>?, error: Pair<String, String?>?) -> Unit
-    typealias DistrictCallback = (List<DistrictNode>?, error: Pair<String, String?>?) -> Unit
-
     // MARK: - Public API
 
     fun searchKeyword(
         keyword: String, city: String, types: String,
-        page: Int, pageSize: Int, callback: POICallback,
+        page: Int, pageSize: Int,
+        callback: (POIPage?, Pair<String, String?>?) -> Unit,
     ) {
         val query = PoiSearch.Query(keyword, types, city).apply {
             pageNum = page - 1; this.pageSize = pageSize
@@ -96,7 +91,8 @@ class AMapSearchAdapter(private val context: Context) {
     fun searchNearby(
         lat: Double, lng: Double, radius: Int,
         keyword: String, types: String,
-        page: Int, pageSize: Int, callback: POICallback,
+        page: Int, pageSize: Int,
+        callback: (POIPage?, Pair<String, String?>?) -> Unit,
     ) {
         val query = PoiSearch.Query(keyword, types, "").apply {
             pageNum = page - 1; this.pageSize = pageSize
@@ -114,7 +110,7 @@ class AMapSearchAdapter(private val context: Context) {
         }
     }
 
-    fun regeocode(lat: Double, lng: Double, callback: RegeocodeCallback) {
+    fun regeocode(lat: Double, lng: Double, callback: (AddressComponent?, Pair<String, String?>?) -> Unit) {
         GeocodeSearch(context).apply {
             setOnGeocodeSearchListener(object : GeocodeSearch.OnGeocodeSearchListener {
                 override fun onRegeocodeSearched(result: RegeocodeResult?, code: Int) {
@@ -139,7 +135,7 @@ class AMapSearchAdapter(private val context: Context) {
         }
     }
 
-    fun geocode(address: String, city: String, callback: GeocodeCallback) {
+    fun geocode(address: String, city: String, callback: (List<GeocodeItem>?, Pair<String, String?>?) -> Unit) {
         GeocodeSearch(context).apply {
             setOnGeocodeSearchListener(object : GeocodeSearch.OnGeocodeSearchListener {
                 override fun onRegeocodeSearched(result: RegeocodeResult?, code: Int) {}
@@ -170,7 +166,7 @@ class AMapSearchAdapter(private val context: Context) {
         originLat: Double, originLng: Double,
         destLat: Double, destLng: Double,
         waypoints: List<Pair<Double, Double>>,
-        callback: RouteCallback,
+        callback: (List<RoutePath>?, Pair<String, String?>?) -> Unit,
     ) {
         val origin = LatLonPoint(originLat, originLng)
         val dest   = LatLonPoint(destLat, destLng)
@@ -198,7 +194,7 @@ class AMapSearchAdapter(private val context: Context) {
     fun walkingRoute(
         originLat: Double, originLng: Double,
         destLat: Double, destLng: Double,
-        callback: RouteCallback,
+        callback: (List<RoutePath>?, Pair<String, String?>?) -> Unit,
     ) {
         val origin = LatLonPoint(originLat, originLng)
         val dest   = LatLonPoint(destLat, destLng)
@@ -219,7 +215,7 @@ class AMapSearchAdapter(private val context: Context) {
         search.calculateWalkRouteAsyn(query)
     }
 
-    fun searchDistrict(keywords: String, callback: DistrictCallback) {
+    fun searchDistrict(keywords: String, callback: (List<DistrictNode>?, Pair<String, String?>?) -> Unit) {
         DistrictSearch(context).apply {
             query = DistrictSearchQuery().also { it.keywords = keywords }
             setOnDistrictSearchListener(object : DistrictSearch.OnDistrictSearchListener {
