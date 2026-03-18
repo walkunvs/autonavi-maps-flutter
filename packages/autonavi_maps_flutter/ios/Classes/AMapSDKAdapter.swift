@@ -85,9 +85,9 @@ class AMapSDKAdapter: NSObject, MAMapViewDelegate {
 
     func takeSnapshot() -> FlutterStandardTypedData? {
         UIGraphicsBeginImageContextWithOptions(mapView.bounds.size, true, 0)
+        defer { UIGraphicsEndImageContext() }
         mapView.drawHierarchy(in: mapView.bounds, afterScreenUpdates: true)
         let image = UIGraphicsGetImageFromCurrentImageContext()
-        UIGraphicsEndImageContext()
         return image?.pngData().map { FlutterStandardTypedData(bytes: $0) }
     }
 

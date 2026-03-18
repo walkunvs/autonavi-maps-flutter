@@ -42,7 +42,8 @@ class SearchChannelHandler: NSObject, FlutterPlugin {
             page:     args["page"]     as? Int ?? 1
         ) { page, err in
             if let err = err { result(FlutterError(code: err.code, message: err.message, details: nil)); return }
-            result(poiPageToMap(page!))
+            guard let page = page else { result(nil); return }
+            result(poiPageToMap(page))
         }
     }
 
@@ -57,7 +58,8 @@ class SearchChannelHandler: NSObject, FlutterPlugin {
             page:      args["page"]      as? Int ?? 1
         ) { page, err in
             if let err = err { result(FlutterError(code: err.code, message: err.message, details: nil)); return }
-            result(poiPageToMap(page!))
+            guard let page = page else { result(nil); return }
+            result(poiPageToMap(page))
         }
     }
 

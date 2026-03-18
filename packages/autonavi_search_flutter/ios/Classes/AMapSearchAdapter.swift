@@ -141,7 +141,7 @@ class AMapSearchAdapter: NSObject, AMapSearchDelegate {
         guard let entry = pendingPOI.removeValue(forKey: ObjectIdentifier(request)) else { return }
         let callback = entry.callback
         let req = entry.request
-        guard response != nil else {
+        guard let response = response else {
             callback(nil, (code: "SEARCH_ERROR", message: "POI search failed"))
             return
         }
@@ -192,7 +192,7 @@ class AMapSearchAdapter: NSObject, AMapSearchDelegate {
 
     func onRouteSearchDone(_ request: AMapRouteSearchBaseRequest!, response: AMapRouteSearchResponse!) {
         guard let callback = pendingRoute.removeValue(forKey: ObjectIdentifier(request)) else { return }
-        guard response != nil else {
+        guard let response = response else {
             callback(nil, (code: "ROUTE_ERROR", message: "Route search failed"))
             return
         }
