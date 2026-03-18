@@ -46,9 +46,8 @@ class SearchChannelHandler: NSObject, FlutterPlugin, AMapSearchDelegate {
         request.keywords = args["keyword"] as? String ?? ""
         request.city = args["city"] as? String ?? ""
         request.types = args["types"] as? String
-        request.offset = Int32(args["pageSize"] as? Int ?? 20)
-        request.page = Int32(args["page"] as? Int ?? 1)
-        request.requireExtension = true
+        request.offset = args["pageSize"] as? Int ?? 20
+        request.page = args["page"] as? Int ?? 1
         pendingResults[ObjectIdentifier(request)] = result
         searchAPI?.aMapPOIKeywordsSearch(request)
     }
@@ -59,12 +58,11 @@ class SearchChannelHandler: NSObject, FlutterPlugin, AMapSearchDelegate {
             withLatitude: CGFloat(args["latitude"] as? Double ?? 0),
             longitude: CGFloat(args["longitude"] as? Double ?? 0)
         )
-        request.radius = Int32(args["radius"] as? Int ?? 1000)
+        request.radius = args["radius"] as? Int ?? 1000
         request.keywords = args["keyword"] as? String
         request.types = args["types"] as? String
-        request.offset = Int32(args["pageSize"] as? Int ?? 20)
-        request.page = Int32(args["page"] as? Int ?? 1)
-        request.requireExtension = true
+        request.offset = args["pageSize"] as? Int ?? 20
+        request.page = args["page"] as? Int ?? 1
         pendingResults[ObjectIdentifier(request)] = result
         searchAPI?.aMapPOIAroundSearch(request)
     }
@@ -86,7 +84,7 @@ class SearchChannelHandler: NSObject, FlutterPlugin, AMapSearchDelegate {
         request.address = args["address"] as? String ?? ""
         request.city = args["city"] as? String
         pendingResults[ObjectIdentifier(request)] = result
-        searchAPI?.aMapGoecodeSearch(request)
+        searchAPI?.aMapGeocodeSearch(request)
     }
 
     private func handleDrivingRoute(_ args: [String: Any], result: @escaping FlutterResult) {
@@ -95,7 +93,7 @@ class SearchChannelHandler: NSObject, FlutterPlugin, AMapSearchDelegate {
             result(FlutterError(code: "INVALID_ARGS", message: "origin/destination required", details: nil))
             return
         }
-        let request = AMapDrivingRouteSearchRequest()
+        let request = AMapDrivingCalRouteSearchRequest()
         request.origin = AMapGeoPoint.location(
             withLatitude: CGFloat(originMap["latitude"] as? Double ?? 0),
             longitude: CGFloat(originMap["longitude"] as? Double ?? 0)
@@ -113,7 +111,7 @@ class SearchChannelHandler: NSObject, FlutterPlugin, AMapSearchDelegate {
             }
         }
         pendingResults[ObjectIdentifier(request)] = result
-        searchAPI?.aMapDrivingRouteSearch(request)
+        searchAPI?.aMapDrivingV2RouteSearch(request)
     }
 
     private func handleWalkingRoute(_ args: [String: Any], result: @escaping FlutterResult) {
@@ -138,8 +136,7 @@ class SearchChannelHandler: NSObject, FlutterPlugin, AMapSearchDelegate {
     private func handleDistrictSearch(_ args: [String: Any], result: @escaping FlutterResult) {
         let request = AMapDistrictSearchRequest()
         request.keywords = args["keywords"] as? String ?? ""
-        request.level = UInt32(args["level"] as? Int ?? 3)
-        request.showBoundary = false
+        request.subdistrict = args["level"] as? Int ?? 3
         pendingResults[ObjectIdentifier(request)] = result
         searchAPI?.aMapDistrictSearch(request)
     }
@@ -159,14 +156,14 @@ class SearchChannelHandler: NSObject, FlutterPlugin, AMapSearchDelegate {
                 "poiId": poi.uid,
                 "title": poi.name,
                 "typeDes": poi.type,
-                "typeCode": poi.typeCode,
-                "latitude": poi.location?.latitude.map { Double($0) },
-                "longitude": poi.location?.longitude.map { Double($0) },
+                "typeCode": poi.typecode,
+                "latitude": poi.location.map { Double($0.latitude) },
+                "longitude": poi.location.map { Double($0.longitude) },
                 "address": poi.address,
                 "tel": poi.tel,
                 "distance": poi.distance,
                 "cityName": poi.city,
-                "adName": poi.adname,
+                "adName": poi.district,
                 "snippet": poi.address,
             ]
         } ?? []
@@ -217,8 +214,8 @@ class SearchChannelHandler: NSObject, FlutterPlugin, AMapSearchDelegate {
                 "cityCode": gc.citycode,
                 "district": gc.district,
                 "adCode": gc.adcode,
-                "latitude": gc.location?.latitude.map { Double($0) },
-                "longitude": gc.location?.longitude.map { Double($0) },
+                "latitude": gc.location.map { Double($0.latitude) },
+                "longitude": gc.location.map { Double($0.longitude) },
                 "level": gc.level,
             ]
         } ?? []
@@ -228,53 +225,32 @@ class SearchChannelHandler: NSObject, FlutterPlugin, AMapSearchDelegate {
     func onRouteSearchDone(_ request: AMapRouteSearchBaseRequest!, response: AMapRouteSearchResponse!) {
         guard let result = pendingResults.removeValue(forKey: ObjectIdentifier(request)) else { return }
 
-        if let drivingResp = response as? AMapDrivingRouteSearchResponse {
-            let paths = drivingResp.route?.paths?.map { path -> [String: Any] in
-                return [
-                    "distance": Double(path.distance),
-                    "duration": Double(path.duration),
-                    "strategy": path.strategy ?? "",
-                    "tolls": Double(path.tolls),
-                    "tollDistance": Double(path.tollDistance),
-                    "trafficLights": Int(path.trafficLights),
-                    "steps": path.steps?.map { step -> [String: Any?] in
-                        return [
-                            "instruction": step.instruction,
-                            "road": step.road,
-                            "distance": Double(step.distance),
-                            "duration": Double(step.duration),
-                            "action": step.action,
-                            "path": step.polyline?.map { pt -> [String: Double] in
-                                return ["latitude": Double(pt.latitude), "longitude": Double(pt.longitude)]
-                            } ?? [],
-                        ]
-                    } ?? [],
-                ]
-            } ?? []
-            result(["paths": paths])
-        } else if let walkingResp = response as? AMapWalkingRouteSearchResponse {
-            let paths = walkingResp.route?.paths?.map { path -> [String: Any] in
-                return [
-                    "distance": Double(path.distance),
-                    "duration": Double(path.duration),
-                    "steps": path.steps?.map { step -> [String: Any?] in
-                        return [
-                            "instruction": step.instruction,
-                            "road": step.road,
-                            "distance": Double(step.distance),
-                            "duration": Double(step.duration),
-                            "action": step.action,
-                            "path": step.polyline?.map { pt -> [String: Double] in
-                                return ["latitude": Double(pt.latitude), "longitude": Double(pt.longitude)]
-                            } ?? [],
-                        ]
-                    } ?? [],
-                ]
-            } ?? []
-            result(["paths": paths])
-        } else {
+        guard response != nil else {
             result(FlutterError(code: "ROUTE_ERROR", message: "Route search failed", details: nil))
+            return
         }
+
+        let paths = response.route?.paths?.map { path -> [String: Any] in
+            return [
+                "distance": Int(path.distance),
+                "duration": Int(path.duration),
+                "strategy": path.strategy ?? "",
+                "tolls": Double(path.tolls),
+                "tollDistance": Int(path.tollDistance),
+                "trafficLights": Int(path.totalTrafficLights),
+                "steps": path.steps?.map { step -> [String: Any?] in
+                    return [
+                        "instruction": step.instruction,
+                        "road": step.road,
+                        "distance": Int(step.distance),
+                        "duration": Int(step.duration),
+                        "action": step.action,
+                        "path": parsePolyline(step.polyline),
+                    ]
+                } ?? [],
+            ]
+        } ?? []
+        result(["paths": paths])
     }
 
     func aMapSearchRequest(_ request: Any!, didFailWithError error: Error!) {
@@ -292,19 +268,32 @@ class SearchChannelHandler: NSObject, FlutterPlugin, AMapSearchDelegate {
         guard let result = pendingResults.removeValue(forKey: ObjectIdentifier(request)) else { return }
 
         func convertDistrict(_ d: AMapDistrict) -> [String: Any?] {
-            let centerParts = d.center?.split(separator: ",")
             return [
                 "name": d.name,
                 "adCode": d.adcode,
                 "cityCode": d.citycode,
                 "level": d.level,
-                "latitude": centerParts?.count == 2 ? Double(centerParts![1]) : nil,
-                "longitude": centerParts?.count == 2 ? Double(centerParts![0]) : nil,
+                "latitude": d.center.map { Double($0.latitude) },
+                "longitude": d.center.map { Double($0.longitude) },
                 "districts": d.districts?.map { convertDistrict($0) } ?? [],
             ]
         }
 
         let items = response.districts?.map { convertDistrict($0) } ?? []
         result(items)
+    }
+
+    // MARK: - Private Helpers
+
+    /// Parses an AMap polyline string ("lon,lat;lon,lat;...") into coordinate dictionaries.
+    private func parsePolyline(_ polyline: String?) -> [[String: Double]] {
+        guard let polyline = polyline, !polyline.isEmpty else { return [] }
+        return polyline.split(separator: ";").compactMap { seg -> [String: Double]? in
+            let parts = seg.split(separator: ",")
+            guard parts.count >= 2,
+                  let lon = Double(parts[0]),
+                  let lat = Double(parts[1]) else { return nil }
+            return ["latitude": lat, "longitude": lon]
+        }
     }
 }
