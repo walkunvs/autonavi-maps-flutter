@@ -243,7 +243,7 @@ class AMapSDKAdapter: NSObject, MAMapViewDelegate {
         guard let id = json["polylineId"] as? String,
               let pts = json["points"] as? [[AnyHashable: Any]] else { return }
         var coords = pts.map { Convert.toLatLng($0) }
-        let ol = MAPolyline(coordinates: &coords, count: UInt(coords.count))
+        guard let ol = MAPolyline(coordinates: &coords, count: UInt(coords.count)) else { return }
         overlayStyles[ObjectIdentifier(ol)] = json
         mapView.add(ol)
         polylines[id] = ol
@@ -253,7 +253,7 @@ class AMapSDKAdapter: NSObject, MAMapViewDelegate {
         guard let id = json["polygonId"] as? String,
               let pts = json["points"] as? [[AnyHashable: Any]] else { return }
         var coords = pts.map { Convert.toLatLng($0) }
-        let ol = MAPolygon(coordinates: &coords, count: UInt(coords.count))
+        guard let ol = MAPolygon(coordinates: &coords, count: UInt(coords.count)) else { return }
         overlayStyles[ObjectIdentifier(ol)] = json
         mapView.add(ol)
         polygons[id] = ol
@@ -263,7 +263,7 @@ class AMapSDKAdapter: NSObject, MAMapViewDelegate {
         guard let id = json["circleId"] as? String,
               let centerJson = json["center"] as? [AnyHashable: Any],
               let radius = (json["radius"] as? NSNumber)?.doubleValue else { return }
-        let ol = MACircle(center: Convert.toLatLng(centerJson), radius: radius)
+        guard let ol = MACircle(center: Convert.toLatLng(centerJson), radius: radius) else { return }
         overlayStyles[ObjectIdentifier(ol)] = json
         mapView.add(ol)
         circles[id] = ol
@@ -276,21 +276,21 @@ class AMapSDKAdapter: NSObject, MAMapViewDelegate {
     /// or width properties of their own.
     func mapView(_ mapView: MAMapView!, rendererFor overlay: MAOverlay!) -> MAOverlayRenderer! {
         let json = overlayStyles[ObjectIdentifier(overlay as AnyObject)] ?? [:]
-        if let polyline = overlay as? MAPolyline {
-            let r = MAPolylineRenderer(polyline: polyline)
+        if let polyline = overlay as? MAPolyline,
+           let r = MAPolylineRenderer(polyline: polyline) {
             if let c = (json["color"] as? NSNumber)?.intValue { r.strokeColor = Convert.toUIColor(c) }
             if let w = (json["width"] as? NSNumber)?.floatValue { r.lineWidth = CGFloat(w) }
             return r
         }
-        if let polygon = overlay as? MAPolygon {
-            let r = MAPolygonRenderer(polygon: polygon)
+        if let polygon = overlay as? MAPolygon,
+           let r = MAPolygonRenderer(polygon: polygon) {
             if let c = (json["fillColor"]   as? NSNumber)?.intValue { r.fillColor   = Convert.toUIColor(c) }
             if let c = (json["strokeColor"] as? NSNumber)?.intValue { r.strokeColor = Convert.toUIColor(c) }
             if let w = (json["strokeWidth"] as? NSNumber)?.floatValue { r.lineWidth = CGFloat(w) }
             return r
         }
-        if let circle = overlay as? MACircle {
-            let r = MACircleRenderer(circle: circle)
+        if let circle = overlay as? MACircle,
+           let r = MACircleRenderer(circle: circle) {
             if let c = (json["fillColor"]   as? NSNumber)?.intValue { r.fillColor   = Convert.toUIColor(c) }
             if let c = (json["strokeColor"] as? NSNumber)?.intValue { r.strokeColor = Convert.toUIColor(c) }
             if let w = (json["strokeWidth"] as? NSNumber)?.floatValue { r.lineWidth = CGFloat(w) }
