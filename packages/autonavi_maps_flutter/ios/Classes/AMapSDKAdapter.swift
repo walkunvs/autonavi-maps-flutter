@@ -231,6 +231,19 @@ class AMapSDKAdapter: NSObject, MAMapViewDelegate {
         onMapLongPress?(Convert.fromLatLng(coordinate))
     }
 
+    func mapView(_ mapView: MAMapView!, viewFor annotation: MAAnnotation!) -> MAAnnotationView! {
+        guard annotation is MAPointAnnotation else { return nil }
+        let reuseId = "pin"
+        let pinView = (mapView.dequeueReusableAnnotationView(withIdentifier: reuseId) as? MAPinAnnotationView)
+            ?? MAPinAnnotationView(annotation: annotation, reuseIdentifier: reuseId)
+        pinView.annotation = annotation
+        // Disable drop animation so the pin is immediately at its final position.
+        // This ensures markers are fully rendered when convertFlutterSurfaceToImage()
+        // captures the surface for screenshot tests.
+        pinView.animatesDrop = false
+        return pinView
+    }
+
     func mapView(_ mapView: MAMapView!, didSelect view: MAAnnotationView!) {
         guard let annotation = view.annotation as? MAPointAnnotation,
               let markerId = markerIdByAnnotation[ObjectIdentifier(annotation)] else { return }

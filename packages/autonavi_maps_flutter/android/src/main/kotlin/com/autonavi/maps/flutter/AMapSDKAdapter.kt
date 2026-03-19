@@ -5,7 +5,7 @@ import android.view.View
 import com.amap.api.maps.AMap
 import com.amap.api.maps.CameraUpdateFactory
 import com.amap.api.maps.CoordinateConverter
-import com.amap.api.maps.MapView
+import com.amap.api.maps.TextureMapView
 import com.amap.api.maps.model.CameraPosition
 import com.amap.api.maps.model.Circle
 import com.amap.api.maps.model.LatLng
@@ -34,7 +34,7 @@ class AMapSDKAdapter(context: Context) :
 
     // MARK: - Private SDK state
 
-    private val mapView = MapView(context)
+    private val mapView = TextureMapView(context)
     private val aMap: AMap get() = mapView.map
     private val markers   = mutableMapOf<String, Marker>()
     private val polylines = mutableMapOf<String, Polyline>()
