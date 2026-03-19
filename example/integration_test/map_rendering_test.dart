@@ -123,6 +123,12 @@ void main() {
   testWidgets('Polyline renders between two points', (tester) async {
     await tester.pumpWidget(
       MapTestApp(
+        // Zoom in so the line is thick relative to the viewport and not lost
+        // among the AMap base-layer transit lines at zoom 12.
+        initialCameraPosition: const CameraPosition(
+          target: LatLng(31.2400, 121.4820),
+          zoom: 14,
+        ),
         polylines: {
           Polyline(
             polylineId: const PolylineId('route-basic'),
@@ -131,7 +137,7 @@ void main() {
               LatLng(31.2500, 121.4900),
             ],
             color: Colors.blue,
-            width: 5,
+            width: 10,
           ),
         },
       ),
@@ -143,6 +149,10 @@ void main() {
   testWidgets('Multi-segment polyline renders correctly', (tester) async {
     await tester.pumpWidget(
       MapTestApp(
+        initialCameraPosition: const CameraPosition(
+          target: LatLng(31.2400, 121.4750),
+          zoom: 13,
+        ),
         polylines: {
           Polyline(
             polylineId: const PolylineId('route-multi'),
@@ -153,7 +163,7 @@ void main() {
               LatLng(31.2700, 121.5100),
             ],
             color: Colors.red,
-            width: 8,
+            width: 10,
           ),
         },
       ),
@@ -187,6 +197,33 @@ void main() {
     );
     await _prepareForScreenshots(binding, tester);
     await _screenshot(binding, 'polygon_filled');
+  });
+
+  testWidgets('Polygon stroke-only renders correctly', (tester) async {
+    await tester.pumpWidget(
+      MapTestApp(
+        // Higher zoom so the triangle shape is clearly visible.
+        initialCameraPosition: const CameraPosition(
+          target: LatLng(31.2304, 121.4737),
+          zoom: 14,
+        ),
+        polygons: {
+          Polygon(
+            polygonId: const PolygonId('area-triangle'),
+            points: const [
+              LatLng(31.2450, 121.4737),
+              LatLng(31.2200, 121.4550),
+              LatLng(31.2200, 121.4920),
+            ],
+            fillColor: const Color(0x60FF6600),
+            strokeColor: Colors.orange,
+            strokeWidth: 4,
+          ),
+        },
+      ),
+    );
+    await _prepareForScreenshots(binding, tester);
+    await _screenshot(binding, 'polygon_triangle');
   });
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -224,6 +261,11 @@ void main() {
   testWidgets('Multiple overlay types render together', (tester) async {
     await tester.pumpWidget(
       MapTestApp(
+        // Zoom in so all three overlay types are clearly visible together.
+        initialCameraPosition: const CameraPosition(
+          target: LatLng(31.2304, 121.4737),
+          zoom: 14,
+        ),
         markers: {
           Marker(
             markerId: const MarkerId('origin'),
@@ -238,7 +280,7 @@ void main() {
               LatLng(31.2500, 121.4900),
             ],
             color: Colors.green,
-            width: 4,
+            width: 6,
           ),
         },
         circles: {
@@ -246,9 +288,9 @@ void main() {
             circleId: const CircleId('buffer'),
             center: const LatLng(31.2304, 121.4737),
             radius: 500,
-            fillColor: const Color(0x2000CC66),
+            fillColor: const Color(0x6000CC66), // opaque enough to see
             strokeColor: Colors.green,
-            strokeWidth: 1,
+            strokeWidth: 3,
           ),
         },
       ),
