@@ -137,11 +137,15 @@ jobs:
   # ───────────────────────────────────────────────────────────────────────────
   # Android Emulator integration tests
   #
-  # Runs on ubuntu-latest with KVM hardware acceleration for Android emulator.
+  # Runs on macos-14 (Apple Silicon) so we can use an arm64-v8a emulator.
+  # The AMap 3dmap SDK ships ARM-only native libraries (.so); x86_64 emulators
+  # on ubuntu-latest cannot load them, producing a blank map on every test.
+  # Apple Silicon Macs run arm64-v8a emulators natively via Hypervisor.framework
+  # (no KVM needed), so AMap JNI initialization succeeds.
   # ───────────────────────────────────────────────────────────────────────────
   integration_test_android:
     name: Integration Tests (Android Emulator)
-    runs-on: ubuntu-latest
+    runs-on: macos-14
     steps:
       - uses: actions/checkout@v5
 
@@ -159,19 +163,12 @@ jobs:
       - name: Install Melos
         run: dart pub get && dart run melos bootstrap
 
-      - name: Enable KVM hardware acceleration
-        run: |
-          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
-            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
-          sudo udevadm control --reload-rules
-          sudo udevadm trigger --name-match=kvm
-
       - name: Run integration tests on Android Emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 33
           target: google_apis
-          arch: x86_64
+          arch: arm64-v8a
           profile: Nexus 6
           script: cd example && flutter drive --driver=test_driver/integration_test.dart --target=integration_test/map_rendering_test.dart -d emulator-5554 "--dart-define=AMAP_ANDROID_KEY=${{ secrets.AMAP_ANDROID_KEY }}"
 

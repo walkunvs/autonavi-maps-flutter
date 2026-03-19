@@ -12,6 +12,8 @@
 // Updating golden baselines:
 //   Copy the screenshots/ output into golden/ after a visual inspection.
 
+import 'dart:io' show Platform;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
@@ -33,13 +35,16 @@ const _tilePaintDelay = Duration(seconds: 15);
 ///   2. Future.delayed — let the CDN tiles finish loading (outside Flutter's
 ///      frame scheduler, so pumpAndSettle cannot observe this).
 ///   3. pump() — sync Flutter with whatever the native layer has painted.
-///   4. convertFlutterSurfaceToImage() — switch to image-capture mode AFTER
-///      tiles are already on screen; calling it earlier can interfere with the
-///      platform-view rendering path on iOS Simulator.
-///   5. pump() — one final frame so the image surface reflects the tiles.
+///   4. convertFlutterSurfaceToImage() — iOS only: switch to image-capture
+///      mode AFTER tiles are on screen. On Android this call is illegal
+///      (the framework asserts Platform.isIOS) and unnecessary because
+///      Android's PixelCopy API captures Hybrid Composition platform views
+///      directly in takeScreenshot().
+///   5. pump() — one final frame so the image surface reflects the tiles
+///      (iOS only; on Android a regular pump() suffices).
 ///
 /// Must be called **exactly once** per test (the framework asserts
-/// !_isSurfaceRendered on every call).
+/// !_isSurfaceRendered on every call, iOS only).
 Future<void> _prepareForScreenshots(
   IntegrationTestWidgetsFlutterBinding binding,
   WidgetTester tester,
@@ -47,8 +52,10 @@ Future<void> _prepareForScreenshots(
   await tester.pump();
   await Future.delayed(_tilePaintDelay);
   await tester.pump();
-  await binding.convertFlutterSurfaceToImage();
-  await tester.pump();
+  if (Platform.isIOS) {
+    await binding.convertFlutterSurfaceToImage();
+    await tester.pump();
+  }
 }
 
 /// Takes a screenshot.  [_prepareForScreenshots] must have been called first.
