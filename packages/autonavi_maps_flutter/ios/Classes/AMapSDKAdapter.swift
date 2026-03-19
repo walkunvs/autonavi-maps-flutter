@@ -22,6 +22,9 @@ class AMapSDKAdapter: NSObject, MAMapViewDelegate {
     private var polygons:  [String: MAPolygon] = [:]
     private var circles:   [String: MACircle] = [:]
     private var markerIdByAnnotation: [ObjectIdentifier: String] = [:]
+    /// Stores the raw JSON for each overlay so the MAMapViewDelegate renderer
+    /// callback can apply color / width / fill styling when AMap asks for it.
+    private var overlayStyles: [ObjectIdentifier: [AnyHashable: Any]] = [:]
 
     // MARK: - Init
 
@@ -155,33 +158,51 @@ class AMapSDKAdapter: NSObject, MAMapViewDelegate {
     func handlePolylineUpdates(_ json: [AnyHashable: Any]) {
         (json["polylinesToAdd"]    as? [[AnyHashable: Any]])?.forEach { addPolyline($0) }
         (json["polylinesToChange"] as? [[AnyHashable: Any]])?.forEach { j in
-            if let id = j["polylineId"] as? String, let ol = polylines.removeValue(forKey: id) { mapView.remove(ol) }
+            if let id = j["polylineId"] as? String, let ol = polylines.removeValue(forKey: id) {
+                overlayStyles.removeValue(forKey: ObjectIdentifier(ol))
+                mapView.remove(ol)
+            }
             addPolyline(j)
         }
         (json["polylineIdsToRemove"] as? [String])?.forEach { id in
-            if let ol = polylines.removeValue(forKey: id) { mapView.remove(ol) }
+            if let ol = polylines.removeValue(forKey: id) {
+                overlayStyles.removeValue(forKey: ObjectIdentifier(ol))
+                mapView.remove(ol)
+            }
         }
     }
 
     func handlePolygonUpdates(_ json: [AnyHashable: Any]) {
         (json["polygonsToAdd"]    as? [[AnyHashable: Any]])?.forEach { addPolygon($0) }
         (json["polygonsToChange"] as? [[AnyHashable: Any]])?.forEach { j in
-            if let id = j["polygonId"] as? String, let ol = polygons.removeValue(forKey: id) { mapView.remove(ol) }
+            if let id = j["polygonId"] as? String, let ol = polygons.removeValue(forKey: id) {
+                overlayStyles.removeValue(forKey: ObjectIdentifier(ol))
+                mapView.remove(ol)
+            }
             addPolygon(j)
         }
         (json["polygonIdsToRemove"] as? [String])?.forEach { id in
-            if let ol = polygons.removeValue(forKey: id) { mapView.remove(ol) }
+            if let ol = polygons.removeValue(forKey: id) {
+                overlayStyles.removeValue(forKey: ObjectIdentifier(ol))
+                mapView.remove(ol)
+            }
         }
     }
 
     func handleCircleUpdates(_ json: [AnyHashable: Any]) {
         (json["circlesToAdd"]    as? [[AnyHashable: Any]])?.forEach { addCircle($0) }
         (json["circlesToChange"] as? [[AnyHashable: Any]])?.forEach { j in
-            if let id = j["circleId"] as? String, let ol = circles.removeValue(forKey: id) { mapView.remove(ol) }
+            if let id = j["circleId"] as? String, let ol = circles.removeValue(forKey: id) {
+                overlayStyles.removeValue(forKey: ObjectIdentifier(ol))
+                mapView.remove(ol)
+            }
             addCircle(j)
         }
         (json["circleIdsToRemove"] as? [String])?.forEach { id in
-            if let ol = circles.removeValue(forKey: id) { mapView.remove(ol) }
+            if let ol = circles.removeValue(forKey: id) {
+                overlayStyles.removeValue(forKey: ObjectIdentifier(ol))
+                mapView.remove(ol)
+            }
         }
     }
 
@@ -223,6 +244,7 @@ class AMapSDKAdapter: NSObject, MAMapViewDelegate {
               let pts = json["points"] as? [[AnyHashable: Any]] else { return }
         var coords = pts.map { Convert.toLatLng($0) }
         let ol = MAPolyline(coordinates: &coords, count: UInt(coords.count))
+        overlayStyles[ObjectIdentifier(ol)] = json
         mapView.add(ol)
         polylines[id] = ol
     }
@@ -232,6 +254,7 @@ class AMapSDKAdapter: NSObject, MAMapViewDelegate {
               let pts = json["points"] as? [[AnyHashable: Any]] else { return }
         var coords = pts.map { Convert.toLatLng($0) }
         let ol = MAPolygon(coordinates: &coords, count: UInt(coords.count))
+        overlayStyles[ObjectIdentifier(ol)] = json
         mapView.add(ol)
         polygons[id] = ol
     }
@@ -241,7 +264,38 @@ class AMapSDKAdapter: NSObject, MAMapViewDelegate {
               let centerJson = json["center"] as? [AnyHashable: Any],
               let radius = (json["radius"] as? NSNumber)?.doubleValue else { return }
         let ol = MACircle(center: Convert.toLatLng(centerJson), radius: radius)
+        overlayStyles[ObjectIdentifier(ol)] = json
         mapView.add(ol)
         circles[id] = ol
+    }
+
+    // MARK: - MAMapViewDelegate — overlay renderer
+
+    /// AMap calls this once per overlay to get a renderer; styling must be
+    /// applied here because MAPolyline / MAPolygon / MACircle carry no color
+    /// or width properties of their own.
+    func mapView(_ mapView: MAMapView!, rendererFor overlay: MAOverlay!) -> MAOverlayRenderer! {
+        let json = overlayStyles[ObjectIdentifier(overlay as AnyObject)] ?? [:]
+        if let polyline = overlay as? MAPolyline {
+            let r = MAPolylineRenderer(polyline: polyline)
+            if let c = (json["color"] as? NSNumber)?.intValue { r.strokeColor = Convert.toUIColor(c) }
+            if let w = (json["width"] as? NSNumber)?.floatValue { r.lineWidth = CGFloat(w) }
+            return r
+        }
+        if let polygon = overlay as? MAPolygon {
+            let r = MAPolygonRenderer(polygon: polygon)
+            if let c = (json["fillColor"]   as? NSNumber)?.intValue { r.fillColor   = Convert.toUIColor(c) }
+            if let c = (json["strokeColor"] as? NSNumber)?.intValue { r.strokeColor = Convert.toUIColor(c) }
+            if let w = (json["strokeWidth"] as? NSNumber)?.floatValue { r.lineWidth = CGFloat(w) }
+            return r
+        }
+        if let circle = overlay as? MACircle {
+            let r = MACircleRenderer(circle: circle)
+            if let c = (json["fillColor"]   as? NSNumber)?.intValue { r.fillColor   = Convert.toUIColor(c) }
+            if let c = (json["strokeColor"] as? NSNumber)?.intValue { r.strokeColor = Convert.toUIColor(c) }
+            if let w = (json["strokeWidth"] as? NSNumber)?.floatValue { r.lineWidth = CGFloat(w) }
+            return r
+        }
+        return nil
     }
 }
