@@ -186,14 +186,19 @@ void main() {
   testWidgets('Circle renders at center with correct radius', (tester) async {
     await tester.pumpWidget(
       MapTestApp(
+        // Zoom in so a 1 km circle is large enough to see clearly.
+        initialCameraPosition: const CameraPosition(
+          target: LatLng(31.2304, 121.4737),
+          zoom: 15,
+        ),
         circles: {
           Circle(
             circleId: const CircleId('circle-basic'),
             center: const LatLng(31.2304, 121.4737),
             radius: 1000, // 1 km radius
-            fillColor: const Color(0x40FF0000),
+            fillColor: const Color(0x80FF0000), // opaque enough to be visible
             strokeColor: Colors.red,
-            strokeWidth: 2,
+            strokeWidth: 4,
           ),
         },
       ),
