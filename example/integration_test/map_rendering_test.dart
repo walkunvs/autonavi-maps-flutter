@@ -27,18 +27,27 @@ import 'test_app/map_test_app.dart';
 // faster because tiles are cached by the OS.
 const _tilePaintDelay = Duration(seconds: 8);
 
-/// Converts the Flutter surface to a raster image and captures it.
-///
-/// [binding.convertFlutterSurfaceToImage] must be called before every
-/// [takeScreenshot] when running via `flutter drive` on a real device or
-/// emulator; skipping it produces a StateError at runtime.
-Future<void> _screenshot(
+/// Performs the initial pump, converts the Flutter surface to a raster image
+/// (must be called **exactly once** per test — the framework asserts that the
+/// surface is not already converted), and then waits for AMap tiles to arrive
+/// from the CDN before returning.
+Future<void> _prepareForScreenshots(
   IntegrationTestWidgetsFlutterBinding binding,
   WidgetTester tester,
+) async {
+  await tester.pump();
+  await binding.convertFlutterSurfaceToImage();
+  await Future.delayed(_tilePaintDelay);
+  await tester.pump();
+}
+
+/// Takes a screenshot.  [_prepareForScreenshots] must have been called first.
+/// For tests that take more than one screenshot, call this helper for each
+/// screenshot WITHOUT calling [_prepareForScreenshots] again.
+Future<void> _screenshot(
+  IntegrationTestWidgetsFlutterBinding binding,
   String name,
 ) async {
-  await binding.convertFlutterSurfaceToImage();
-  await tester.pump();
   await binding.takeScreenshot(name);
 }
 
@@ -51,11 +60,8 @@ void main() {
 
   testWidgets('Map renders without overlays', (tester) async {
     await tester.pumpWidget(const MapTestApp());
-    await tester.pump();
-    await Future.delayed(_tilePaintDelay);
-    await tester.pump();
-
-    await _screenshot(binding, tester, 'map_empty');
+    await _prepareForScreenshots(binding, tester);
+    await _screenshot(binding, 'map_empty');
   });
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -73,11 +79,8 @@ void main() {
         },
       ),
     );
-    await tester.pump();
-    await Future.delayed(_tilePaintDelay);
-    await tester.pump();
-
-    await _screenshot(binding, tester, 'marker_single');
+    await _prepareForScreenshots(binding, tester);
+    await _screenshot(binding, 'marker_single');
   });
 
   testWidgets('Multiple markers render at distinct positions', (tester) async {
@@ -99,11 +102,8 @@ void main() {
         },
       ),
     );
-    await tester.pump();
-    await Future.delayed(_tilePaintDelay);
-    await tester.pump();
-
-    await _screenshot(binding, tester, 'marker_multiple');
+    await _prepareForScreenshots(binding, tester);
+    await _screenshot(binding, 'marker_multiple');
   });
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -126,11 +126,8 @@ void main() {
         },
       ),
     );
-    await tester.pump();
-    await Future.delayed(_tilePaintDelay);
-    await tester.pump();
-
-    await _screenshot(binding, tester, 'polyline_basic');
+    await _prepareForScreenshots(binding, tester);
+    await _screenshot(binding, 'polyline_basic');
   });
 
   testWidgets('Multi-segment polyline renders correctly', (tester) async {
@@ -151,11 +148,8 @@ void main() {
         },
       ),
     );
-    await tester.pump();
-    await Future.delayed(_tilePaintDelay);
-    await tester.pump();
-
-    await _screenshot(binding, tester, 'polyline_multi_segment');
+    await _prepareForScreenshots(binding, tester);
+    await _screenshot(binding, 'polyline_multi_segment');
   });
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -181,11 +175,8 @@ void main() {
         },
       ),
     );
-    await tester.pump();
-    await Future.delayed(_tilePaintDelay);
-    await tester.pump();
-
-    await _screenshot(binding, tester, 'polygon_filled');
+    await _prepareForScreenshots(binding, tester);
+    await _screenshot(binding, 'polygon_filled');
   });
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -207,11 +198,8 @@ void main() {
         },
       ),
     );
-    await tester.pump();
-    await Future.delayed(_tilePaintDelay);
-    await tester.pump();
-
-    await _screenshot(binding, tester, 'circle_basic');
+    await _prepareForScreenshots(binding, tester);
+    await _screenshot(binding, 'circle_basic');
   });
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -250,11 +238,8 @@ void main() {
         },
       ),
     );
-    await tester.pump();
-    await Future.delayed(_tilePaintDelay);
-    await tester.pump();
-
-    await _screenshot(binding, tester, 'overlay_combined');
+    await _prepareForScreenshots(binding, tester);
+    await _screenshot(binding, 'overlay_combined');
   });
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -282,10 +267,9 @@ void main() {
         builder: (context, markers, _) => MapTestApp(markers: markers),
       ),
     );
-    await tester.pump();
-    await Future.delayed(_tilePaintDelay);
-    await tester.pump();
-    await _screenshot(binding, tester, 'marker_update_before');
+    // convertFlutterSurfaceToImage is called exactly once for this test.
+    await _prepareForScreenshots(binding, tester);
+    await _screenshot(binding, 'marker_update_before');
 
     // Move the marker to position B to trigger markers#update channel call.
     markerState.value = {
@@ -294,10 +278,11 @@ void main() {
         position: const LatLng(31.2500, 121.4900),
       ),
     };
+    // Do NOT call _prepareForScreenshots again — surface is already converted.
     await tester.pump();
     await Future.delayed(_tilePaintDelay);
     await tester.pump();
-    await _screenshot(binding, tester, 'marker_update_after');
+    await _screenshot(binding, 'marker_update_after');
   });
 
 }
