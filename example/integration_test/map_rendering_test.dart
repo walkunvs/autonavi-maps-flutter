@@ -20,24 +20,34 @@ import 'package:autonavi_maps_flutter/autonavi_maps_flutter.dart';
 
 import 'test_app/map_test_app.dart';
 
-// How long to wait for AMap tiles to load from the network after Flutter
-// settles. AMap tiles are fetched asynchronously from a CDN and are NOT
-// captured by pumpAndSettle (which only drains Flutter's frame scheduler).
-// The first test on a cold runner may need 8–10 s; subsequent tests are
-// faster because tiles are cached by the OS.
-const _tilePaintDelay = Duration(seconds: 8);
+// How long to wait for AMap tiles to load from the network.
+// AMap tiles are fetched asynchronously from a CDN and are NOT captured by
+// pumpAndSettle (which only drains Flutter's frame scheduler).
+// 15 s covers cold-start latency on GitHub Actions macOS/ubuntu runners.
+const _tilePaintDelay = Duration(seconds: 15);
 
-/// Performs the initial pump, converts the Flutter surface to a raster image
-/// (must be called **exactly once** per test — the framework asserts that the
-/// surface is not already converted), and then waits for AMap tiles to arrive
-/// from the CDN before returning.
+/// Waits for AMap tiles, then converts the Flutter surface to a raster image.
+///
+/// Call order matters:
+///   1. pump() — kick off the initial render so the native map view exists.
+///   2. Future.delayed — let the CDN tiles finish loading (outside Flutter's
+///      frame scheduler, so pumpAndSettle cannot observe this).
+///   3. pump() — sync Flutter with whatever the native layer has painted.
+///   4. convertFlutterSurfaceToImage() — switch to image-capture mode AFTER
+///      tiles are already on screen; calling it earlier can interfere with the
+///      platform-view rendering path on iOS Simulator.
+///   5. pump() — one final frame so the image surface reflects the tiles.
+///
+/// Must be called **exactly once** per test (the framework asserts
+/// !_isSurfaceRendered on every call).
 Future<void> _prepareForScreenshots(
   IntegrationTestWidgetsFlutterBinding binding,
   WidgetTester tester,
 ) async {
   await tester.pump();
-  await binding.convertFlutterSurfaceToImage();
   await Future.delayed(_tilePaintDelay);
+  await tester.pump();
+  await binding.convertFlutterSurfaceToImage();
   await tester.pump();
 }
 
