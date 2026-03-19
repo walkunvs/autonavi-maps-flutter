@@ -20,8 +20,12 @@ import 'package:autonavi_maps_flutter/autonavi_maps_flutter.dart';
 
 import 'test_app/map_test_app.dart';
 
-// How long to wait for the map tiles and SDK to fully render after pump.
-const _mapSettleTimeout = Duration(seconds: 5);
+// How long to wait for AMap tiles to load from the network after Flutter
+// settles. AMap tiles are fetched asynchronously from a CDN and are NOT
+// captured by pumpAndSettle (which only drains Flutter's frame scheduler).
+// The first test on a cold runner may need 8–10 s; subsequent tests are
+// faster because tiles are cached by the OS.
+const _tilePaintDelay = Duration(seconds: 8);
 
 void main() {
   final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
@@ -32,7 +36,9 @@ void main() {
 
   testWidgets('Map renders without overlays', (tester) async {
     await tester.pumpWidget(const MapTestApp());
-    await tester.pumpAndSettle(_mapSettleTimeout);
+    await tester.pump();
+    await Future.delayed(_tilePaintDelay);
+    await tester.pump();
 
     await binding.takeScreenshot('map_empty');
   });
@@ -52,7 +58,9 @@ void main() {
         },
       ),
     );
-    await tester.pumpAndSettle(_mapSettleTimeout);
+    await tester.pump();
+    await Future.delayed(_tilePaintDelay);
+    await tester.pump();
 
     await binding.takeScreenshot('marker_single');
   });
@@ -76,7 +84,9 @@ void main() {
         },
       ),
     );
-    await tester.pumpAndSettle(_mapSettleTimeout);
+    await tester.pump();
+    await Future.delayed(_tilePaintDelay);
+    await tester.pump();
 
     await binding.takeScreenshot('marker_multiple');
   });
@@ -101,7 +111,9 @@ void main() {
         },
       ),
     );
-    await tester.pumpAndSettle(_mapSettleTimeout);
+    await tester.pump();
+    await Future.delayed(_tilePaintDelay);
+    await tester.pump();
 
     await binding.takeScreenshot('polyline_basic');
   });
@@ -124,7 +136,9 @@ void main() {
         },
       ),
     );
-    await tester.pumpAndSettle(_mapSettleTimeout);
+    await tester.pump();
+    await Future.delayed(_tilePaintDelay);
+    await tester.pump();
 
     await binding.takeScreenshot('polyline_multi_segment');
   });
@@ -152,7 +166,9 @@ void main() {
         },
       ),
     );
-    await tester.pumpAndSettle(_mapSettleTimeout);
+    await tester.pump();
+    await Future.delayed(_tilePaintDelay);
+    await tester.pump();
 
     await binding.takeScreenshot('polygon_filled');
   });
@@ -176,7 +192,9 @@ void main() {
         },
       ),
     );
-    await tester.pumpAndSettle(_mapSettleTimeout);
+    await tester.pump();
+    await Future.delayed(_tilePaintDelay);
+    await tester.pump();
 
     await binding.takeScreenshot('circle_basic');
   });
@@ -217,7 +235,9 @@ void main() {
         },
       ),
     );
-    await tester.pumpAndSettle(_mapSettleTimeout);
+    await tester.pump();
+    await Future.delayed(_tilePaintDelay);
+    await tester.pump();
 
     await binding.takeScreenshot('overlay_combined');
   });
@@ -247,7 +267,9 @@ void main() {
         builder: (context, markers, _) => MapTestApp(markers: markers),
       ),
     );
-    await tester.pumpAndSettle(_mapSettleTimeout);
+    await tester.pump();
+    await Future.delayed(_tilePaintDelay);
+    await tester.pump();
     await binding.takeScreenshot('marker_update_before');
 
     // Move the marker to position B to trigger markers#update channel call.
@@ -257,7 +279,9 @@ void main() {
         position: const LatLng(31.2500, 121.4900),
       ),
     };
-    await tester.pumpAndSettle(_mapSettleTimeout);
+    await tester.pump();
+    await Future.delayed(_tilePaintDelay);
+    await tester.pump();
     await binding.takeScreenshot('marker_update_after');
   });
 
