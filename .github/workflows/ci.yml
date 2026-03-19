@@ -174,11 +174,8 @@ jobs:
           arch: x86_64
           profile: Nexus 6
           script: |
-            cd example && flutter drive \
-              --driver=test_driver/integration_test.dart \
-              --target=integration_test/map_rendering_test.dart \
-              -d emulator-5554 \
-              --dart-define=AMAP_ANDROID_KEY=${{ secrets.AMAP_ANDROID_KEY }}
+            cd example
+            flutter drive --driver=test_driver/integration_test.dart --target=integration_test/map_rendering_test.dart -d emulator-5554 "--dart-define=AMAP_ANDROID_KEY=${{ secrets.AMAP_ANDROID_KEY }}"
 
       - name: Upload screenshots artifact
         uses: actions/upload-artifact@v6
