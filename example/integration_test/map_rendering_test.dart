@@ -27,6 +27,21 @@ import 'test_app/map_test_app.dart';
 // faster because tiles are cached by the OS.
 const _tilePaintDelay = Duration(seconds: 8);
 
+/// Converts the Flutter surface to a raster image and captures it.
+///
+/// [binding.convertFlutterSurfaceToImage] must be called before every
+/// [takeScreenshot] when running via `flutter drive` on a real device or
+/// emulator; skipping it produces a StateError at runtime.
+Future<void> _screenshot(
+  IntegrationTestWidgetsFlutterBinding binding,
+  WidgetTester tester,
+  String name,
+) async {
+  await binding.convertFlutterSurfaceToImage();
+  await tester.pump();
+  await binding.takeScreenshot(name);
+}
+
 void main() {
   final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
@@ -40,7 +55,7 @@ void main() {
     await Future.delayed(_tilePaintDelay);
     await tester.pump();
 
-    await binding.takeScreenshot('map_empty');
+    await _screenshot(binding, tester, 'map_empty');
   });
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -62,7 +77,7 @@ void main() {
     await Future.delayed(_tilePaintDelay);
     await tester.pump();
 
-    await binding.takeScreenshot('marker_single');
+    await _screenshot(binding, tester, 'marker_single');
   });
 
   testWidgets('Multiple markers render at distinct positions', (tester) async {
@@ -88,7 +103,7 @@ void main() {
     await Future.delayed(_tilePaintDelay);
     await tester.pump();
 
-    await binding.takeScreenshot('marker_multiple');
+    await _screenshot(binding, tester, 'marker_multiple');
   });
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -115,7 +130,7 @@ void main() {
     await Future.delayed(_tilePaintDelay);
     await tester.pump();
 
-    await binding.takeScreenshot('polyline_basic');
+    await _screenshot(binding, tester, 'polyline_basic');
   });
 
   testWidgets('Multi-segment polyline renders correctly', (tester) async {
@@ -140,7 +155,7 @@ void main() {
     await Future.delayed(_tilePaintDelay);
     await tester.pump();
 
-    await binding.takeScreenshot('polyline_multi_segment');
+    await _screenshot(binding, tester, 'polyline_multi_segment');
   });
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -170,7 +185,7 @@ void main() {
     await Future.delayed(_tilePaintDelay);
     await tester.pump();
 
-    await binding.takeScreenshot('polygon_filled');
+    await _screenshot(binding, tester, 'polygon_filled');
   });
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -196,7 +211,7 @@ void main() {
     await Future.delayed(_tilePaintDelay);
     await tester.pump();
 
-    await binding.takeScreenshot('circle_basic');
+    await _screenshot(binding, tester, 'circle_basic');
   });
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -239,7 +254,7 @@ void main() {
     await Future.delayed(_tilePaintDelay);
     await tester.pump();
 
-    await binding.takeScreenshot('overlay_combined');
+    await _screenshot(binding, tester, 'overlay_combined');
   });
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -270,7 +285,7 @@ void main() {
     await tester.pump();
     await Future.delayed(_tilePaintDelay);
     await tester.pump();
-    await binding.takeScreenshot('marker_update_before');
+    await _screenshot(binding, tester, 'marker_update_before');
 
     // Move the marker to position B to trigger markers#update channel call.
     markerState.value = {
@@ -282,7 +297,7 @@ void main() {
     await tester.pump();
     await Future.delayed(_tilePaintDelay);
     await tester.pump();
-    await binding.takeScreenshot('marker_update_after');
+    await _screenshot(binding, tester, 'marker_update_after');
   });
 
 }
