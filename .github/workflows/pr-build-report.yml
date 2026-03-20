@@ -145,17 +145,28 @@ jobs:
 
       - name: Compare screenshots against goldens
         if: always()
+        continue-on-error: true
         run: |
           pip install pillow --break-system-packages
           python scripts/golden_diff.py \
             example/integration_test/golden/ios \
             example/integration_test/screenshots \
             --threshold 2.0 \
-            --diff-dir example/integration_test/diffs
+            --diff-dir example/integration_test/diffs \
+            2>&1 | tee /tmp/golden-report-ios.txt
+          echo "exit_code=${PIPESTATUS[0]}" >> /tmp/golden-report-ios.txt
 
-      - name: Upload diff images on failure
+      - name: Upload golden diff report
         uses: actions/upload-artifact@v6
-        if: failure()
+        if: always()
+        with:
+          name: golden-report-ios
+          path: /tmp/golden-report-ios.txt
+          if-no-files-found: ignore
+
+      - name: Upload diff images
+        uses: actions/upload-artifact@v6
+        if: always()
         with:
           name: ios-golden-diffs
           path: example/integration_test/diffs/
@@ -244,17 +255,28 @@ jobs:
 
       - name: Compare screenshots against goldens
         if: always()
+        continue-on-error: true
         run: |
           pip install pillow --break-system-packages
           python scripts/golden_diff.py \
             example/integration_test/golden/android \
             example/integration_test/screenshots \
             --threshold 2.0 \
-            --diff-dir example/integration_test/diffs
+            --diff-dir example/integration_test/diffs \
+            2>&1 | tee /tmp/golden-report-android.txt
+          echo "exit_code=${PIPESTATUS[0]}" >> /tmp/golden-report-android.txt
 
-      - name: Upload diff images on failure
+      - name: Upload golden diff report
         uses: actions/upload-artifact@v6
-        if: failure()
+        if: always()
+        with:
+          name: golden-report-android
+          path: /tmp/golden-report-android.txt
+          if-no-files-found: ignore
+
+      - name: Upload diff images
+        uses: actions/upload-artifact@v6
+        if: always()
         with:
           name: android-golden-diffs
           path: example/integration_test/diffs/

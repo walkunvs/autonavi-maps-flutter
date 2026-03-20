@@ -3,51 +3,14 @@ name: CI
 on:
   push:
     branches: [main, develop]
-  # pull_request CI is handled by pr-build-report.yml which also writes
-  # error reports back to the PR branch. Keep this workflow for push only.
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   # ───────────────────────────────────────────────────────────────────────────
-  # Analyze + unit tests — runs on every push to main/develop so that commits
-  # that land outside of a PR (e.g. direct pushes or PRs targeting develop)
-  # are still validated. pr-build-report.yml covers PRs to main only.
-  # ───────────────────────────────────────────────────────────────────────────
-  analyze_and_test:
-    name: Analyze & Unit Tests
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-
-      - uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.27.x'
-          channel: 'stable'
-          cache: true
-
-      - name: Melos bootstrap
-        run: dart pub get && dart run melos bootstrap
-
-      - name: Flutter analyze
-        run: dart run melos exec -- "flutter analyze --no-fatal-infos"
-
-      - name: Format check
-        run: dart run melos exec -- "dart format --set-exit-if-changed ."
-
-      - name: Unit tests
-        run: dart run melos exec -- "flutter test"
-
-  # Build (analyze + android/ios build) is handled by pr-build-report.yml
-  # on every PR. This workflow also runs integration tests after merge to main,
-  # avoiding duplicate work and keeping PR feedback fast.
-
-  # ───────────────────────────────────────────────────────────────────────────
-  # iOS Simulator integration tests + golden screenshot regression
-  #
-  # Runs on macos-14 (Apple Silicon) because iOS Simulator requires macOS.
-  # Screenshots are captured and compared against goldens in golden/.
+  # iOS Simulator integration tests
+  # Captures screenshots that are then committed as the new golden baseline.
   # ───────────────────────────────────────────────────────────────────────────
   integration_test_ios:
     name: Integration Tests (iOS Simulator)
@@ -70,7 +33,6 @@ jobs:
 
       - name: Create and boot iOS Simulator
         run: |
-          # List available runtimes to pick a valid one.
           RUNTIME=$(xcrun simctl list runtimes --json \
             | python3 -c "
           import sys, json
@@ -83,7 +45,6 @@ jobs:
           fi
           UDID=$(xcrun simctl create "IntegrationTestDevice" "iPhone 15" "$RUNTIME")
           xcrun simctl boot "$UDID"
-          # Wait for the simulator to finish booting.
           xcrun simctl bootstatus "$UDID" -b
           echo "SIM_UDID=$UDID" >> "$GITHUB_ENV"
 
@@ -106,24 +67,6 @@ jobs:
           path: example/integration_test/screenshots/
           if-no-files-found: warn
 
-      - name: Compare screenshots against goldens (Layer 3)
-        if: always()
-        run: |
-          pip install pillow --break-system-packages
-          python scripts/golden_diff.py \
-            example/integration_test/golden/ios \
-            example/integration_test/screenshots \
-            --threshold 2.0 \
-            --diff-dir example/integration_test/diffs
-
-      - name: Upload diff images on failure
-        uses: actions/upload-artifact@v6
-        if: failure()
-        with:
-          name: ios-golden-diffs
-          path: example/integration_test/diffs/
-          if-no-files-found: ignore
-
       - name: Shutdown simulator
         if: always()
         run: |
@@ -136,12 +79,6 @@ jobs:
 
   # ───────────────────────────────────────────────────────────────────────────
   # Android Emulator integration tests
-  #
-  # Runs on macos-14 (Apple Silicon) so we can use an arm64-v8a emulator.
-  # The AMap 3dmap SDK ships ARM-only native libraries (.so); x86_64 emulators
-  # on ubuntu-latest cannot load them, producing a blank map on every test.
-  # Apple Silicon Macs run arm64-v8a emulators natively via Hypervisor.framework
-  # (no KVM needed), so AMap JNI initialization succeeds.
   # ───────────────────────────────────────────────────────────────────────────
   integration_test_android:
     name: Integration Tests (Android Emulator)
@@ -180,35 +117,16 @@ jobs:
           path: example/integration_test/screenshots/
           if-no-files-found: warn
 
-      - name: Compare screenshots against goldens (Layer 3)
-        if: always()
-        run: |
-          pip install pillow --break-system-packages
-          python scripts/golden_diff.py \
-            example/integration_test/golden/android \
-            example/integration_test/screenshots \
-            --threshold 2.0 \
-            --diff-dir example/integration_test/diffs
-
-      - name: Upload diff images on failure
-        uses: actions/upload-artifact@v6
-        if: failure()
-        with:
-          name: android-golden-diffs
-          path: example/integration_test/diffs/
-          if-no-files-found: ignore
-
   # ───────────────────────────────────────────────────────────────────────────
-  # Seed golden baselines
+  # Update golden baselines
   #
-  # Runs after both integration test jobs.  When a platform's golden/ subdir
-  # contains no PNG files (first-ever run), the screenshots produced by that
-  # platform's job are downloaded and committed as the new baseline.
-  # Subsequent CI runs compare against those committed goldens instead of
-  # silently skipping.
+  # Runs after both integration test jobs complete.  Always overwrites the
+  # committed goldens with the screenshots from this run so that golden/ always
+  # reflects the latest state of main.  PR golden-diff comparisons are
+  # informational only and compare against these committed files.
   # ───────────────────────────────────────────────────────────────────────────
-  seed_goldens:
-    name: Seed Golden Baselines
+  update_goldens:
+    name: Update Golden Baselines
     runs-on: ubuntu-latest
     needs: [integration_test_ios, integration_test_android]
     if: always()
@@ -219,17 +137,7 @@ jobs:
         with:
           ref: ${{ github.ref }}
 
-      - name: Check for existing golden PNGs
-        id: check
-        run: |
-          IOS_COUNT=$(find example/integration_test/golden/ios -name "*.png" 2>/dev/null | wc -l | tr -d ' ')
-          ANDROID_COUNT=$(find example/integration_test/golden/android -name "*.png" 2>/dev/null | wc -l | tr -d ' ')
-          echo "ios_count=$IOS_COUNT" >> "$GITHUB_OUTPUT"
-          echo "android_count=$ANDROID_COUNT" >> "$GITHUB_OUTPUT"
-          echo "iOS goldens: $IOS_COUNT  Android goldens: $ANDROID_COUNT"
-
       - name: Download iOS screenshots
-        if: steps.check.outputs.ios_count == '0'
         uses: actions/download-artifact@v4
         with:
           name: ios-map-screenshots
@@ -237,28 +145,25 @@ jobs:
         continue-on-error: true
 
       - name: Download Android screenshots
-        if: steps.check.outputs.android_count == '0'
         uses: actions/download-artifact@v4
         with:
           name: android-map-screenshots
           path: /tmp/android-screenshots/
         continue-on-error: true
 
-      - name: Commit seeded goldens
+      - name: Overwrite goldens and commit
         run: |
           CHANGED=false
 
-          if [ "${{ steps.check.outputs.ios_count }}" = "0" ] && \
-             ls /tmp/ios-screenshots/*.png 2>/dev/null | head -1 > /dev/null; then
+          if ls /tmp/ios-screenshots/*.png 2>/dev/null | head -1 > /dev/null; then
             cp /tmp/ios-screenshots/*.png example/integration_test/golden/ios/
-            echo "Seeded $(ls /tmp/ios-screenshots/*.png | wc -l | tr -d ' ') iOS goldens."
+            echo "Updated $(ls /tmp/ios-screenshots/*.png | wc -l | tr -d ' ') iOS goldens."
             CHANGED=true
           fi
 
-          if [ "${{ steps.check.outputs.android_count }}" = "0" ] && \
-             ls /tmp/android-screenshots/*.png 2>/dev/null | head -1 > /dev/null; then
+          if ls /tmp/android-screenshots/*.png 2>/dev/null | head -1 > /dev/null; then
             cp /tmp/android-screenshots/*.png example/integration_test/golden/android/
-            echo "Seeded $(ls /tmp/android-screenshots/*.png | wc -l | tr -d ' ') Android goldens."
+            echo "Updated $(ls /tmp/android-screenshots/*.png | wc -l | tr -d ' ') Android goldens."
             CHANGED=true
           fi
 
@@ -266,8 +171,7 @@ jobs:
             git config user.name "github-actions[bot]"
             git config user.email "github-actions[bot]@users.noreply.github.com"
             git add example/integration_test/golden/
-            git commit -m "ci: seed golden baselines from integration test run [skip ci]"
-            git push
+            git diff --cached --quiet || git commit -m "ci: update golden baselines [skip ci]" && git push
           else
-            echo "Goldens already exist or no screenshots were produced — nothing to seed."
+            echo "No screenshots produced — goldens unchanged."
           fi

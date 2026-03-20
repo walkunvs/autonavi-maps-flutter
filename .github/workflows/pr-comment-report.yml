@@ -75,12 +75,41 @@ jobs:
               body += `> ✅ All checks passed!\n\n`;
             }
 
-            // Link to screenshots artifact if integration tests ran
+            // Golden screenshot diff reports (informational only, never blocks the PR)
+            const goldenReports = [
+              { label: 'iOS',     file: '/tmp/artifacts/golden-report-ios/golden-report-ios.txt',         diffsArtifact: 'ios-golden-diffs' },
+              { label: 'Android', file: '/tmp/artifacts/golden-report-android/golden-report-android.txt', diffsArtifact: 'android-golden-diffs' },
+            ];
+            const goldenSections = [];
+            for (const r of goldenReports) {
+              let reportText = '';
+              try { reportText = fs.readFileSync(r.file, 'utf8').trim(); } catch { continue; }
+              if (!reportText) continue;
+
+              // Extract the exit_code line we appended
+              const lines = reportText.split('\n');
+              const exitLine = lines.find(l => l.startsWith('exit_code='));
+              const exitCode = exitLine ? parseInt(exitLine.split('=')[1]) : 0;
+              const reportBody = lines.filter(l => !l.startsWith('exit_code=')).join('\n').trim();
+
+              const statusIcon = exitCode === 0 ? '✅' : '⚠️';
+              goldenSections.push(
+                `<details>\n<summary>${statusIcon} Golden diff — ${r.label}</summary>\n\n\`\`\`\n${reportBody}\n\`\`\`\n\n` +
+                (exitCode !== 0 ? `[View diff images artifact](${runUrl})\n` : '') +
+                `</details>`
+              );
+            }
+            if (goldenSections.length > 0) {
+              body += `---\n### Screenshot Comparison _(informational)_\n\n`;
+              body += goldenSections.join('\n\n') + '\n\n';
+            }
+
+            // Link to screenshots artifacts
             if (results.integration_ios !== 'skipped') {
-              body += `📸 **Screenshots:** [ios-screenshots artifact](${runUrl})\n`;
+              body += `📸 [iOS screenshots](${runUrl})  `;
             }
             if (results.integration_android !== 'skipped') {
-              body += `📸 **Screenshots:** [android-screenshots artifact](${runUrl})\n`;
+              body += `📸 [Android screenshots](${runUrl})\n`;
             }
             body += `\n**Commit:** ${headSha.slice(0, 7)} | **Run:** [${context.payload.workflow_run.id}](${runUrl})`;
 
