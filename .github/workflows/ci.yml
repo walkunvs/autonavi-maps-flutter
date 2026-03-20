@@ -111,7 +111,7 @@ jobs:
         run: |
           pip install pillow --break-system-packages
           python scripts/golden_diff.py \
-            example/integration_test/golden \
+            example/integration_test/golden/ios \
             example/integration_test/screenshots \
             --threshold 2.0 \
             --diff-dir example/integration_test/diffs
@@ -185,7 +185,7 @@ jobs:
         run: |
           pip install pillow --break-system-packages
           python scripts/golden_diff.py \
-            example/integration_test/golden \
+            example/integration_test/golden/android \
             example/integration_test/screenshots \
             --threshold 2.0 \
             --diff-dir example/integration_test/diffs
@@ -197,3 +197,77 @@ jobs:
           name: android-golden-diffs
           path: example/integration_test/diffs/
           if-no-files-found: ignore
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # Seed golden baselines
+  #
+  # Runs after both integration test jobs.  When a platform's golden/ subdir
+  # contains no PNG files (first-ever run), the screenshots produced by that
+  # platform's job are downloaded and committed as the new baseline.
+  # Subsequent CI runs compare against those committed goldens instead of
+  # silently skipping.
+  # ───────────────────────────────────────────────────────────────────────────
+  seed_goldens:
+    name: Seed Golden Baselines
+    runs-on: ubuntu-latest
+    needs: [integration_test_ios, integration_test_android]
+    if: always()
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Check for existing golden PNGs
+        id: check
+        run: |
+          IOS_COUNT=$(find example/integration_test/golden/ios -name "*.png" 2>/dev/null | wc -l | tr -d ' ')
+          ANDROID_COUNT=$(find example/integration_test/golden/android -name "*.png" 2>/dev/null | wc -l | tr -d ' ')
+          echo "ios_count=$IOS_COUNT" >> "$GITHUB_OUTPUT"
+          echo "android_count=$ANDROID_COUNT" >> "$GITHUB_OUTPUT"
+          echo "iOS goldens: $IOS_COUNT  Android goldens: $ANDROID_COUNT"
+
+      - name: Download iOS screenshots
+        if: steps.check.outputs.ios_count == '0'
+        uses: actions/download-artifact@v4
+        with:
+          name: ios-map-screenshots
+          path: /tmp/ios-screenshots/
+        continue-on-error: true
+
+      - name: Download Android screenshots
+        if: steps.check.outputs.android_count == '0'
+        uses: actions/download-artifact@v4
+        with:
+          name: android-map-screenshots
+          path: /tmp/android-screenshots/
+        continue-on-error: true
+
+      - name: Commit seeded goldens
+        run: |
+          CHANGED=false
+
+          if [ "${{ steps.check.outputs.ios_count }}" = "0" ] && \
+             ls /tmp/ios-screenshots/*.png 2>/dev/null | head -1 > /dev/null; then
+            cp /tmp/ios-screenshots/*.png example/integration_test/golden/ios/
+            echo "Seeded $(ls /tmp/ios-screenshots/*.png | wc -l | tr -d ' ') iOS goldens."
+            CHANGED=true
+          fi
+
+          if [ "${{ steps.check.outputs.android_count }}" = "0" ] && \
+             ls /tmp/android-screenshots/*.png 2>/dev/null | head -1 > /dev/null; then
+            cp /tmp/android-screenshots/*.png example/integration_test/golden/android/
+            echo "Seeded $(ls /tmp/android-screenshots/*.png | wc -l | tr -d ' ') Android goldens."
+            CHANGED=true
+          fi
+
+          if [ "$CHANGED" = "true" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add example/integration_test/golden/
+            git commit -m "ci: seed golden baselines from integration test run [skip ci]"
+            git push
+          else
+            echo "Goldens already exist or no screenshots were produced — nothing to seed."
+          fi

@@ -148,7 +148,7 @@ jobs:
         run: |
           pip install pillow --break-system-packages
           python scripts/golden_diff.py \
-            example/integration_test/golden \
+            example/integration_test/golden/ios \
             example/integration_test/screenshots \
             --threshold 2.0 \
             --diff-dir example/integration_test/diffs
@@ -247,7 +247,7 @@ jobs:
         run: |
           pip install pillow --break-system-packages
           python scripts/golden_diff.py \
-            example/integration_test/golden \
+            example/integration_test/golden/android \
             example/integration_test/screenshots \
             --threshold 2.0 \
             --diff-dir example/integration_test/diffs
