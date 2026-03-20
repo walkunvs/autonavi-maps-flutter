@@ -43,10 +43,11 @@ class AMapSDKAdapter(context: Context) :
 
     init {
         mapView.onCreate(null)
-        // TextureMapView requires onResume() to start the render loop and
-        // tile-loading pipeline.  Unlike GLSurfaceView (MapView), it does not
-        // auto-start its render thread; without this call the map stays black.
-        mapView.onResume()
+        // TextureMapView requires onResume() to start the render loop.  Posting
+        // to the view's Handler defers the call until after the view is attached
+        // to the window and its SurfaceTexture is ready; calling it too early
+        // (e.g. before attachment) leaves the map black.
+        mapView.post { mapView.onResume() }
         aMap.addOnCameraChangeListener(this)
         aMap.setOnMapClickListener(this)
         aMap.setOnMapLongClickListener(this)
