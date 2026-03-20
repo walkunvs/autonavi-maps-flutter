@@ -12,8 +12,6 @@
 // Updating golden baselines:
 //   Copy the screenshots/ output into golden/ after a visual inspection.
 
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
@@ -22,8 +20,45 @@ import 'package:autonavi_maps_flutter/autonavi_maps_flutter.dart';
 
 import 'test_app/map_test_app.dart';
 
-// How long to wait for the map tiles and SDK to fully render after pump.
-const _mapSettleTimeout = Duration(seconds: 5);
+// How long to wait for AMap tiles to load from the network.
+// AMap tiles are fetched asynchronously from a CDN and are NOT captured by
+// pumpAndSettle (which only drains Flutter's frame scheduler).
+// 15 s covers cold-start latency on GitHub Actions macOS/ubuntu runners.
+const _tilePaintDelay = Duration(seconds: 15);
+
+/// Waits for AMap tiles, then converts the Flutter surface to a raster image.
+///
+/// Call order matters:
+///   1. pump() — kick off the initial render so the native map view exists.
+///   2. Future.delayed — let the CDN tiles finish loading (outside Flutter's
+///      frame scheduler, so pumpAndSettle cannot observe this).
+///   3. pump() — sync Flutter with whatever the native layer has painted.
+///   4. convertFlutterSurfaceToImage() — required on all platforms to switch
+///      to image-capture mode before takeScreenshot() can be called.
+///   5. pump() — one final frame so the image surface reflects the tiles.
+///
+/// Must be called **exactly once** per test (the framework asserts
+/// !_isSurfaceRendered on every call).
+Future<void> _prepareForScreenshots(
+  IntegrationTestWidgetsFlutterBinding binding,
+  WidgetTester tester,
+) async {
+  await tester.pump();
+  await Future.delayed(_tilePaintDelay);
+  await tester.pump();
+  await binding.convertFlutterSurfaceToImage();
+  await tester.pump();
+}
+
+/// Takes a screenshot.  [_prepareForScreenshots] must have been called first.
+/// For tests that take more than one screenshot, call this helper for each
+/// screenshot WITHOUT calling [_prepareForScreenshots] again.
+Future<void> _screenshot(
+  IntegrationTestWidgetsFlutterBinding binding,
+  String name,
+) async {
+  await binding.takeScreenshot(name);
+}
 
 void main() {
   final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
@@ -34,9 +69,8 @@ void main() {
 
   testWidgets('Map renders without overlays', (tester) async {
     await tester.pumpWidget(const MapTestApp());
-    await tester.pumpAndSettle(_mapSettleTimeout);
-
-    await binding.takeScreenshot('map_empty');
+    await _prepareForScreenshots(binding, tester);
+    await _screenshot(binding, 'map_empty');
   });
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -54,9 +88,8 @@ void main() {
         },
       ),
     );
-    await tester.pumpAndSettle(_mapSettleTimeout);
-
-    await binding.takeScreenshot('marker_single');
+    await _prepareForScreenshots(binding, tester);
+    await _screenshot(binding, 'marker_single');
   });
 
   testWidgets('Multiple markers render at distinct positions', (tester) async {
@@ -78,9 +111,8 @@ void main() {
         },
       ),
     );
-    await tester.pumpAndSettle(_mapSettleTimeout);
-
-    await binding.takeScreenshot('marker_multiple');
+    await _prepareForScreenshots(binding, tester);
+    await _screenshot(binding, 'marker_multiple');
   });
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -90,6 +122,12 @@ void main() {
   testWidgets('Polyline renders between two points', (tester) async {
     await tester.pumpWidget(
       MapTestApp(
+        // Zoom in so the line is thick relative to the viewport and not lost
+        // among the AMap base-layer transit lines at zoom 12.
+        initialCameraPosition: const CameraPosition(
+          target: LatLng(31.2400, 121.4820),
+          zoom: 14,
+        ),
         polylines: {
           Polyline(
             polylineId: const PolylineId('route-basic'),
@@ -98,19 +136,22 @@ void main() {
               LatLng(31.2500, 121.4900),
             ],
             color: Colors.blue,
-            width: 5,
+            width: 10,
           ),
         },
       ),
     );
-    await tester.pumpAndSettle(_mapSettleTimeout);
-
-    await binding.takeScreenshot('polyline_basic');
+    await _prepareForScreenshots(binding, tester);
+    await _screenshot(binding, 'polyline_basic');
   });
 
   testWidgets('Multi-segment polyline renders correctly', (tester) async {
     await tester.pumpWidget(
       MapTestApp(
+        initialCameraPosition: const CameraPosition(
+          target: LatLng(31.2400, 121.4750),
+          zoom: 13,
+        ),
         polylines: {
           Polyline(
             polylineId: const PolylineId('route-multi'),
@@ -121,14 +162,13 @@ void main() {
               LatLng(31.2700, 121.5100),
             ],
             color: Colors.red,
-            width: 8,
+            width: 10,
           ),
         },
       ),
     );
-    await tester.pumpAndSettle(_mapSettleTimeout);
-
-    await binding.takeScreenshot('polyline_multi_segment');
+    await _prepareForScreenshots(binding, tester);
+    await _screenshot(binding, 'polyline_multi_segment');
   });
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -154,9 +194,35 @@ void main() {
         },
       ),
     );
-    await tester.pumpAndSettle(_mapSettleTimeout);
+    await _prepareForScreenshots(binding, tester);
+    await _screenshot(binding, 'polygon_filled');
+  });
 
-    await binding.takeScreenshot('polygon_filled');
+  testWidgets('Polygon stroke-only renders correctly', (tester) async {
+    await tester.pumpWidget(
+      MapTestApp(
+        // Higher zoom so the triangle shape is clearly visible.
+        initialCameraPosition: const CameraPosition(
+          target: LatLng(31.2304, 121.4737),
+          zoom: 14,
+        ),
+        polygons: {
+          Polygon(
+            polygonId: const PolygonId('area-triangle'),
+            points: const [
+              LatLng(31.2450, 121.4737),
+              LatLng(31.2200, 121.4550),
+              LatLng(31.2200, 121.4920),
+            ],
+            fillColor: const Color(0x60FF6600),
+            strokeColor: Colors.orange,
+            strokeWidth: 4,
+          ),
+        },
+      ),
+    );
+    await _prepareForScreenshots(binding, tester);
+    await _screenshot(binding, 'polygon_triangle');
   });
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -166,21 +232,25 @@ void main() {
   testWidgets('Circle renders at center with correct radius', (tester) async {
     await tester.pumpWidget(
       MapTestApp(
+        // Zoom in so a 1 km circle is large enough to see clearly.
+        initialCameraPosition: const CameraPosition(
+          target: LatLng(31.2304, 121.4737),
+          zoom: 15,
+        ),
         circles: {
           Circle(
             circleId: const CircleId('circle-basic'),
             center: const LatLng(31.2304, 121.4737),
             radius: 1000, // 1 km radius
-            fillColor: const Color(0x40FF0000),
+            fillColor: const Color(0x80FF0000), // opaque enough to be visible
             strokeColor: Colors.red,
-            strokeWidth: 2,
+            strokeWidth: 4,
           ),
         },
       ),
     );
-    await tester.pumpAndSettle(_mapSettleTimeout);
-
-    await binding.takeScreenshot('circle_basic');
+    await _prepareForScreenshots(binding, tester);
+    await _screenshot(binding, 'circle_basic');
   });
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -190,6 +260,11 @@ void main() {
   testWidgets('Multiple overlay types render together', (tester) async {
     await tester.pumpWidget(
       MapTestApp(
+        // Zoom in so all three overlay types are clearly visible together.
+        initialCameraPosition: const CameraPosition(
+          target: LatLng(31.2304, 121.4737),
+          zoom: 14,
+        ),
         markers: {
           Marker(
             markerId: const MarkerId('origin'),
@@ -204,7 +279,7 @@ void main() {
               LatLng(31.2500, 121.4900),
             ],
             color: Colors.green,
-            width: 4,
+            width: 6,
           ),
         },
         circles: {
@@ -212,16 +287,15 @@ void main() {
             circleId: const CircleId('buffer'),
             center: const LatLng(31.2304, 121.4737),
             radius: 500,
-            fillColor: const Color(0x2000CC66),
+            fillColor: const Color(0x6000CC66), // opaque enough to see
             strokeColor: Colors.green,
-            strokeWidth: 1,
+            strokeWidth: 3,
           ),
         },
       ),
     );
-    await tester.pumpAndSettle(_mapSettleTimeout);
-
-    await binding.takeScreenshot('overlay_combined');
+    await _prepareForScreenshots(binding, tester);
+    await _screenshot(binding, 'overlay_combined');
   });
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -249,8 +323,9 @@ void main() {
         builder: (context, markers, _) => MapTestApp(markers: markers),
       ),
     );
-    await tester.pumpAndSettle(_mapSettleTimeout);
-    await binding.takeScreenshot('marker_update_before');
+    // convertFlutterSurfaceToImage is called exactly once for this test.
+    await _prepareForScreenshots(binding, tester);
+    await _screenshot(binding, 'marker_update_before');
 
     // Move the marker to position B to trigger markers#update channel call.
     markerState.value = {
@@ -259,32 +334,11 @@ void main() {
         position: const LatLng(31.2500, 121.4900),
       ),
     };
-    await tester.pumpAndSettle(_mapSettleTimeout);
-    await binding.takeScreenshot('marker_update_after');
+    // Do NOT call _prepareForScreenshots again — surface is already converted.
+    await tester.pump();
+    await Future.delayed(_tilePaintDelay);
+    await tester.pump();
+    await _screenshot(binding, 'marker_update_after');
   });
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // Save screenshots for golden comparison
-  //
-  // After all tests, copy captured screenshots to the screenshots/ directory
-  // so that the CI golden_diff.py script can compare them against golden/.
-  // ─────────────────────────────────────────────────────────────────────────
-
-  tearDownAll(() async {
-    final screenshotsDir = Directory('integration_test/screenshots');
-    if (!screenshotsDir.existsSync()) {
-      screenshotsDir.createSync(recursive: true);
-    }
-
-    // takeScreenshot stores screenshots in reportData['screenshots'] as
-    // List<Map<String,dynamic>> with keys 'screenshotName' and 'bytes'.
-    final screenshots =
-        binding.reportData?['screenshots'] as List<dynamic>?;
-    for (final entry in screenshots ?? []) {
-      final screenshot = entry as Map<String, dynamic>;
-      final file = File(
-          '${screenshotsDir.path}/${screenshot['screenshotName']}.png');
-      file.writeAsBytesSync(screenshot['bytes'] as List<int>);
-    }
-  });
 }

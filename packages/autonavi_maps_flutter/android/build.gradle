@@ -26,5 +26,7 @@ android {
 }
 
 dependencies {
+    // Pinned to exact version — upgrade intentionally and review the official changelog first.
+    // Changelog: https://lbs.amap.com/api/android-sdk/guide/create-project/android-studio-create-project
     implementation 'com.amap.api:3dmap:10.0.600'
 }

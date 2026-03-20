@@ -26,6 +26,8 @@ android {
 }
 
 dependencies {
+    // Pinned to search-9.7.1 (stripped variant) — upgrade intentionally and review the official changelog first.
+    // Changelog: https://lbs.amap.com/api/android-sdk/guide/create-project/android-studio-create-project
     // search-9.7.1-stripped.jar is search-9.7.1 with com.amap.apis.utils.*,
     // com.amap.api.location.*, and com.amap.api.fence.* removed to avoid
     // duplicate class conflicts with 3dmap-10.0.600 and location-6.5.1 which
