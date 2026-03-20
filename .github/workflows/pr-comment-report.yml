@@ -75,6 +75,32 @@ jobs:
               body += `> ✅ All checks passed!\n\n`;
             }
 
+            // Golden screenshot diff reports (informational, never blocks the PR)
+            const goldenReports = [
+              { label: 'iOS',     file: '/tmp/artifacts/golden-report-ios/golden-report-ios.txt' },
+              { label: 'Android', file: '/tmp/artifacts/golden-report-android/golden-report-android.txt' },
+            ];
+            const goldenSections = [];
+            for (const r of goldenReports) {
+              let reportText = '';
+              try { reportText = fs.readFileSync(r.file, 'utf8').trim(); } catch { continue; }
+              if (!reportText) continue;
+              const lines = reportText.split('\n');
+              const exitLine = lines.find(l => l.startsWith('exit_code='));
+              const exitCode = exitLine ? parseInt(exitLine.split('=')[1]) : 0;
+              const reportBody = lines.filter(l => !l.startsWith('exit_code=')).join('\n').trim();
+              const statusIcon = exitCode === 0 ? '✅' : '⚠️';
+              goldenSections.push(
+                `<details>\n<summary>${statusIcon} Screenshot diff — ${r.label}</summary>\n\n\`\`\`\n${reportBody}\n\`\`\`\n` +
+                (exitCode !== 0 ? `\n[View diff images](${runUrl})\n` : '') +
+                `</details>`
+              );
+            }
+            if (goldenSections.length > 0) {
+              body += `---\n### Screenshot Comparison _(informational — does not block merge)_\n\n`;
+              body += goldenSections.join('\n\n') + '\n\n';
+            }
+
             // Link to screenshots artifacts
             if (results.integration_ios !== 'skipped') {
               body += `📸 [iOS screenshots](${runUrl})  `;
