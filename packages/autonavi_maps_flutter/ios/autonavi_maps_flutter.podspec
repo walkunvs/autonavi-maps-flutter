@@ -14,7 +14,9 @@ Provides map rendering, camera control, and map overlays.
   s.static_framework = true
 
   s.dependency 'Flutter'
-  s.dependency 'AMap3DMap', '~> 9.7'
+  # Pinned to exact version — upgrade intentionally and review the official changelog first.
+  # Changelog: https://lbs.amap.com/api/ios-sdk/guide/create-project/cocoapods
+  s.dependency 'AMap3DMap', '9.7.0'
   s.platform         = :ios, '12.0'
 
   s.pod_target_xcconfig = { 'DEFINES_MODULE' => 'YES', 'EXCLUDED_ARCHS[sdk=iphonesimulator*]' => 'i386' }
