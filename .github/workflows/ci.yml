@@ -54,7 +54,8 @@ jobs:
             --driver=test_driver/integration_test.dart \
             --target=integration_test/map_rendering_test.dart \
             --device-id "$SIM_UDID" \
-            --dart-define=AMAP_IOS_KEY=${{ secrets.AMAP_IOS_KEY }}
+            --dart-define=AMAP_IOS_KEY=${{ secrets.AMAP_IOS_KEY }} \
+            --dart-define=CI=true
         working-directory: example
         env:
           SIM_UDID: ${{ env.SIM_UDID }}
@@ -114,7 +115,7 @@ jobs:
           target: google_apis
           arch: x86_64
           profile: Nexus 6
-          script: cd example && flutter drive --driver=test_driver/integration_test.dart --target=integration_test/map_rendering_test.dart -d emulator-5554 "--dart-define=AMAP_ANDROID_KEY=${{ secrets.AMAP_ANDROID_KEY }}"
+          script: cd example && flutter drive --driver=test_driver/integration_test.dart --target=integration_test/map_rendering_test.dart -d emulator-5554 "--dart-define=AMAP_ANDROID_KEY=${{ secrets.AMAP_ANDROID_KEY }}" --dart-define=CI=true
 
       - name: Upload screenshots artifact
         uses: actions/upload-artifact@v6

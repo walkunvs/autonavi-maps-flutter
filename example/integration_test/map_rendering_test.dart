@@ -23,8 +23,12 @@ import 'test_app/map_test_app.dart';
 // How long to wait for AMap tiles to load from the network.
 // AMap tiles are fetched asynchronously from a CDN and are NOT captured by
 // pumpAndSettle (which only drains Flutter's frame scheduler).
-// 15 s covers cold-start latency on GitHub Actions macOS/ubuntu runners.
-const _tilePaintDelay = Duration(seconds: 15);
+// CI=true → 45 s to account for cold CDN connections on GitHub Actions runners
+// (Chinese CDN latency from macOS/ubuntu runners is high on first request).
+// Local runs use 15 s for a faster feedback cycle.
+final _tilePaintDelay = const bool.fromEnvironment('CI')
+    ? const Duration(seconds: 45)
+    : const Duration(seconds: 15);
 
 /// Waits for AMap tiles, then converts the Flutter surface to a raster image.
 ///
@@ -320,7 +324,11 @@ void main() {
     await tester.pumpWidget(
       ValueListenableBuilder<Set<Marker>>(
         valueListenable: markerState,
-        builder: (context, markers, _) => MapTestApp(markers: markers),
+        // Stable key keeps the MapTestApp (and its AMap platform view) alive
+        // across marker-set changes, preventing a destroy/recreate cycle that
+        // would cause the map to appear pink in the screenshot.
+        builder: (context, markers, _) =>
+            MapTestApp(key: const ValueKey('map'), markers: markers),
       ),
     );
     // convertFlutterSurfaceToImage is called exactly once for this test.
