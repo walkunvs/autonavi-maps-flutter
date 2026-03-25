@@ -20,15 +20,12 @@ import 'package:autonavi_maps_flutter/autonavi_maps_flutter.dart';
 
 import 'test_app/map_test_app.dart';
 
-// How long to wait for AMap tiles to load from the network.
-// AMap tiles are fetched asynchronously from a CDN and are NOT captured by
-// pumpAndSettle (which only drains Flutter's frame scheduler).
-// CI=true → 45 s to account for cold CDN connections on GitHub Actions runners
-// (Chinese CDN latency from macOS/ubuntu runners is high on first request).
-// Local runs use 15 s for a faster feedback cycle.
-final _tilePaintDelay = const bool.fromEnvironment('CI')
-    ? const Duration(seconds: 45)
-    : const Duration(seconds: 15);
+// How long to wait after mounting the map widget before taking a screenshot.
+// These tests verify overlay rendering (markers, polylines, polygons, circles),
+// not tile loading — tiles are background decoration and irrelevant here.
+// The delay only needs to cover AMap SDK initialisation + overlay placement,
+// both of which happen locally without any network round-trip.
+const _tilePaintDelay = Duration(seconds: 5);
 
 /// Waits for AMap tiles, then converts the Flutter surface to a raster image.
 ///
