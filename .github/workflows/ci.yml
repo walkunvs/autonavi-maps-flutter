@@ -120,9 +120,10 @@ jobs:
   # ───────────────────────────────────────────────────────────────────────────
   # Update golden baselines
   #
-  # Runs after both integration test jobs complete.  Always overwrites the
-  # committed goldens with the screenshots from this run so that golden/
-  # always reflects the latest state of main.
+  # Runs after both integration test jobs complete.  Opens a PR to overwrite
+  # the committed goldens with the screenshots from this run.  Using
+  # peter-evans/create-pull-request instead of a direct git push so that the
+  # update works even when main requires pull requests (branch protection).
   # ───────────────────────────────────────────────────────────────────────────
   update_goldens:
     name: Update Golden Baselines
@@ -131,6 +132,7 @@ jobs:
     if: always()
     permissions:
       contents: write
+      pull-requests: write
     steps:
       - uses: actions/checkout@v5
         with:
@@ -150,7 +152,7 @@ jobs:
           path: /tmp/android-screenshots/
         continue-on-error: true
 
-      - name: Overwrite goldens and commit
+      - name: Overwrite goldens
         run: |
           CHANGED=false
 
@@ -166,11 +168,23 @@ jobs:
             CHANGED=true
           fi
 
-          if [ "$CHANGED" = "true" ]; then
-            git config user.name "github-actions[bot]"
-            git config user.email "github-actions[bot]@users.noreply.github.com"
-            git add example/integration_test/golden/
-            git diff --cached --quiet || git commit -m "ci: update golden baselines [skip ci]" && git push
-          else
+          echo "CHANGED=$CHANGED" >> "$GITHUB_ENV"
+
+          if [ "$CHANGED" = "false" ]; then
             echo "No screenshots produced — goldens unchanged."
           fi
+
+      - name: Open PR with updated goldens
+        if: env.CHANGED == 'true'
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "ci: update golden baselines [skip ci]"
+          branch: ci/golden-baselines
+          delete-branch: true
+          title: "ci: update golden baselines"
+          body: |
+            Automated update of golden baseline screenshots from the latest CI run.
+
+            Triggered by: ${{ github.sha }} (`${{ github.ref_name }}`)
+          labels: automated,ci
