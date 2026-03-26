@@ -232,16 +232,21 @@ jobs:
           target: google_apis
           arch: x86_64
           profile: Nexus 6
-          script: cd example && flutter drive --driver=test_driver/integration_test.dart --target=integration_test/map_rendering_test.dart -d emulator-5554 "--dart-define=AMAP_ANDROID_KEY=${{ secrets.AMAP_ANDROID_KEY }}" > /tmp/integration-android.log 2>&1
+          script: |
+            cd example
+            flutter drive \
+              --driver=test_driver/integration_test.dart \
+              --target=integration_test/map_rendering_test.dart \
+              -d emulator-5554 \
+              "--dart-define=AMAP_ANDROID_KEY=${{ secrets.AMAP_ANDROID_KEY }}" \
+              > /tmp/integration-android.log 2>&1
+            DRIVE_EXIT=$?
+            mkdir -p integration_test/screenshots
+            adb pull \
+              /sdcard/Android/data/com.example.autonavi_maps_flutter_example/files/screenshots/. \
+              integration_test/screenshots/ >> /tmp/integration-android.log 2>&1 || true
+            exit $DRIVE_EXIT
         continue-on-error: true
-
-      - name: Pull screenshots from device
-        if: always()
-        run: |
-          mkdir -p example/integration_test/screenshots
-          adb pull \
-            /sdcard/Android/data/com.example.autonavi_maps_flutter_example/files/screenshots/. \
-            example/integration_test/screenshots/ || true
 
       - name: Capture job status
         id: capture
