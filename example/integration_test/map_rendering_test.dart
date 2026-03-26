@@ -22,10 +22,10 @@ import 'package:autonavi_maps_flutter/autonavi_maps_flutter.dart';
 
 import 'test_app/map_test_app.dart';
 
-// How long to wait for the AMap SDK to initialise on first launch.
-// Overlay placement is a local operation (no network) so only the SDK
-// cold-start matters.  5 s is sufficient on GitHub Actions runners.
-const _mapInitDelay = Duration(seconds: 5);
+// How long to wait for the AMap SDK to initialise on first launch and for
+// map tiles to finish loading.  10 s gives slower GitHub Actions runners
+// enough time to fetch and render the initial tile set.
+const _mapInitDelay = Duration(seconds: 10);
 
 // How long to wait after updating overlays before taking a screenshot.
 // The update travels: Dart setState → platform channel → native SDK render.
@@ -193,7 +193,7 @@ void main() {
       Circle(
         circleId: const CircleId('circle-basic'),
         center: const LatLng(31.2304, 121.4737),
-        radius: 300,
+        radius: 600,
         fillColor: const Color(0x80FF0000),
         strokeColor: Colors.red,
         strokeWidth: 4,
