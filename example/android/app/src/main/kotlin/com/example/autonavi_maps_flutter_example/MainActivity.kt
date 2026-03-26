@@ -3,7 +3,7 @@ package com.example.autonavi_maps_flutter_example
 import android.graphics.Bitmap
 import android.os.Build
 import android.os.Handler
-import android.os.HandlerThread
+import android.os.Looper
 import android.view.PixelCopy
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -43,15 +43,16 @@ class MainActivity : FlutterActivity() {
         val bitmap = Bitmap.createBitmap(
             decorView.width,
             decorView.height,
-            Bitmap.Config.ARGB_8888
+            Bitmap.Config.ARGB_8888,
         )
 
-        val thread = HandlerThread("PixelCopyThread")
-        thread.start()
-
-        PixelCopy.request(window, bitmap, { copyResult ->
-            thread.quitSafely()
-            runOnUiThread {
+        // Use the main looper so the callback runs on the UI thread, which
+        // is required by MethodChannel.Result and avoids HandlerThread null-
+        // safety issues (HandlerThread.looper is @Nullable in the SDK).
+        PixelCopy.request(
+            window,
+            bitmap,
+            { copyResult ->
                 if (copyResult == PixelCopy.SUCCESS) {
                     try {
                         val dir = File(getExternalFilesDir(null), "screenshots")
@@ -70,7 +71,8 @@ class MainActivity : FlutterActivity() {
                     bitmap.recycle()
                     result.error("PIXEL_COPY_FAILED", "PixelCopy result: $copyResult", null)
                 }
-            }
-        }, Handler(thread.looper))
+            },
+            Handler(Looper.getMainLooper()),
+        )
     }
 }

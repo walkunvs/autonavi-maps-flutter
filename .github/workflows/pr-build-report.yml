@@ -234,18 +234,19 @@ jobs:
           profile: Nexus 6
           script: |
             cd example
+            DRIVE_RESULT=0
             flutter drive \
               --driver=test_driver/integration_test.dart \
               --target=integration_test/map_rendering_test.dart \
               -d emulator-5554 \
               "--dart-define=AMAP_ANDROID_KEY=${{ secrets.AMAP_ANDROID_KEY }}" \
-              > /tmp/integration-android.log 2>&1
-            DRIVE_EXIT=$?
+              > /tmp/integration-android.log 2>&1 \
+              || DRIVE_RESULT=$?
             mkdir -p integration_test/screenshots
             adb pull \
               /sdcard/Android/data/com.example.autonavi_maps_flutter_example/files/screenshots/. \
               integration_test/screenshots/ >> /tmp/integration-android.log 2>&1 || true
-            exit $DRIVE_EXIT
+            exit $DRIVE_RESULT
         continue-on-error: true
 
       - name: Capture job status
