@@ -233,19 +233,26 @@ jobs:
           arch: x86_64
           profile: Nexus 6
           script: |
+            LOG=/tmp/integration-android.log
+            touch "$LOG"
+            echo "=== pwd: $(pwd)" >> "$LOG"
+            echo "=== flutter: $(flutter --version 2>&1 | head -1)" >> "$LOG"
             cd example
-            DRIVE_RESULT=0
+            echo "=== running flutter drive ===" >> "$LOG"
             flutter drive \
               --driver=test_driver/integration_test.dart \
               --target=integration_test/map_rendering_test.dart \
               -d emulator-5554 \
               "--dart-define=AMAP_ANDROID_KEY=${{ secrets.AMAP_ANDROID_KEY }}" \
-              > /tmp/integration-android.log 2>&1 \
-              || DRIVE_RESULT=$?
+              2>&1 | tee -a "$LOG"
+            DRIVE_RESULT=${PIPESTATUS[0]}
+            echo "=== flutter drive exit=$DRIVE_RESULT ===" >> "$LOG"
             mkdir -p integration_test/screenshots
+            echo "=== adb pull ===" >> "$LOG"
             adb pull \
               /sdcard/Android/data/com.example.autonavi_maps_flutter_example/files/screenshots/. \
-              integration_test/screenshots/ >> /tmp/integration-android.log 2>&1 || true
+              integration_test/screenshots/ 2>&1 | tee -a "$LOG" || true
+            echo "=== done ===" >> "$LOG"
             exit $DRIVE_RESULT
         continue-on-error: true
 
