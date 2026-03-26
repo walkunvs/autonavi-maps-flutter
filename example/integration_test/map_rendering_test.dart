@@ -17,6 +17,7 @@
 import 'dart:io' show Platform;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 
@@ -85,17 +86,17 @@ void main() {
     await Future.delayed(_mapInitDelay);
     await tester.pump();
 
-    // Android's _IOCallbackManager.takeScreenshot() throws a StateError unless
-    // convertFlutterSurfaceToImage() has been called at least once.  On iOS the
-    // host takes a native XCUITest screenshot that already captures platform
-    // views, so calling this would produce blank images — skip it there.
-    if (Platform.isAndroid) {
-      await binding.convertFlutterSurfaceToImage();
-    }
+    // Android: PixelCopy reads the hardware compositor (GPU framebuffer) so
+    // AMap's OpenGL ES tiles are included.  Screenshots are saved directly to
+    // the app's external files dir; CI pulls them with `adb pull` after the
+    // test completes.  convertFlutterSurfaceToImage() is intentionally NOT
+    // called — it hides Hybrid Composition platform views, producing a blank
+    // white screen.
+    //
+    // iOS: binding.takeScreenshot() uses the host-side XCUITest native
+    // screenshot API which already captures platform views correctly.
+    const _screenshotChannel = MethodChannel('com.example.autonavi/screenshot');
 
-    // Sets overlays, waits for the platform-channel round-trip to complete,
-    // then captures the full screen (including the AMap platform view) via
-    // the native device screenshot API.
     Future<void> shoot(
       String name, {
       Set<Marker> markers = const {},
@@ -112,7 +113,11 @@ void main() {
       await tester.pump();
       await Future.delayed(_overlayUpdateDelay);
       await tester.pump();
-      await binding.takeScreenshot(name);
+      if (Platform.isAndroid) {
+        await _screenshotChannel.invokeMethod<String>('captureAndSave', name);
+      } else {
+        await binding.takeScreenshot(name);
+      }
     }
 
     // ── Empty map ─────────────────────────────────────────────────────────
