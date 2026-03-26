@@ -14,6 +14,8 @@
 // Updating golden baselines:
 //   Copy the screenshots/ output into golden/ after a visual inspection.
 
+import 'dart:io' show Platform;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
@@ -82,6 +84,14 @@ void main() {
     await tester.pump();
     await Future.delayed(_mapInitDelay);
     await tester.pump();
+
+    // Android's _IOCallbackManager.takeScreenshot() throws a StateError unless
+    // convertFlutterSurfaceToImage() has been called at least once.  On iOS the
+    // host takes a native XCUITest screenshot that already captures platform
+    // views, so calling this would produce blank images — skip it there.
+    if (Platform.isAndroid) {
+      await binding.convertFlutterSurfaceToImage();
+    }
 
     // Sets overlays, waits for the platform-channel round-trip to complete,
     // then captures the full screen (including the AMap platform view) via
@@ -224,7 +234,7 @@ void main() {
         Circle(
           circleId: const CircleId('buffer'),
           center: const LatLng(31.2304, 121.4737),
-          radius: 200,
+          radius: 500,
           fillColor: const Color(0x6000CC66),
           strokeColor: Colors.green,
           strokeWidth: 3,
