@@ -27,19 +27,21 @@ import 'test_app/map_test_app.dart';
 // both of which happen locally without any network round-trip.
 const _tilePaintDelay = Duration(seconds: 5);
 
-/// Waits for AMap tiles, then converts the Flutter surface to a raster image.
+/// Waits for the AMap SDK to initialise and place overlays, then takes a
+/// screenshot via the native device screenshot API.
 ///
-/// Call order matters:
+/// `binding.takeScreenshot()` in flutter_drive mode calls the platform's
+/// native capture mechanism (UIGraphicsImageRenderer on iOS, Bitmap on
+/// Android), which includes the AMap platform view in the output.
+/// `convertFlutterSurfaceToImage()` is intentionally NOT called here: that
+/// helper only captures the Flutter rendering layer and produces a blank/pink
+/// result where a platform view (the map) sits.
+///
+/// Call order:
 ///   1. pump() — kick off the initial render so the native map view exists.
-///   2. Future.delayed — let the CDN tiles finish loading (outside Flutter's
-///      frame scheduler, so pumpAndSettle cannot observe this).
-///   3. pump() — sync Flutter with whatever the native layer has painted.
-///   4. convertFlutterSurfaceToImage() — required on all platforms to switch
-///      to image-capture mode before takeScreenshot() can be called.
-///   5. pump() — one final frame so the image surface reflects the tiles.
-///
-/// Must be called **exactly once** per test (the framework asserts
-/// !_isSurfaceRendered on every call).
+///   2. Future.delayed — give the AMap SDK time to initialise its coordinate
+///      system and place overlays (local, no network required).
+///   3. pump() — sync Flutter with the latest frame before capturing.
 Future<void> _prepareForScreenshots(
   IntegrationTestWidgetsFlutterBinding binding,
   WidgetTester tester,
@@ -47,13 +49,9 @@ Future<void> _prepareForScreenshots(
   await tester.pump();
   await Future.delayed(_tilePaintDelay);
   await tester.pump();
-  await binding.convertFlutterSurfaceToImage();
-  await tester.pump();
 }
 
-/// Takes a screenshot.  [_prepareForScreenshots] must have been called first.
-/// For tests that take more than one screenshot, call this helper for each
-/// screenshot WITHOUT calling [_prepareForScreenshots] again.
+/// Takes a screenshot via the native device screenshot API.
 Future<void> _screenshot(
   IntegrationTestWidgetsFlutterBinding binding,
   String name,
@@ -328,7 +326,6 @@ void main() {
             MapTestApp(key: const ValueKey('map'), markers: markers),
       ),
     );
-    // convertFlutterSurfaceToImage is called exactly once for this test.
     await _prepareForScreenshots(binding, tester);
     await _screenshot(binding, 'marker_update_before');
 
@@ -339,7 +336,6 @@ void main() {
         position: const LatLng(31.2500, 121.4900),
       ),
     };
-    // Do NOT call _prepareForScreenshots again — surface is already converted.
     await tester.pump();
     await Future.delayed(_tilePaintDelay);
     await tester.pump();
