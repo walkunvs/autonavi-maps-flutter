@@ -123,11 +123,11 @@ void main() {
       ),
       Marker(
         markerId: const MarkerId('marker-b'),
-        position: const LatLng(31.2500, 121.4900),
+        position: const LatLng(31.2440, 121.4830),
       ),
       Marker(
         markerId: const MarkerId('marker-c'),
-        position: const LatLng(31.2100, 121.4500),
+        position: const LatLng(31.2170, 121.4640),
       ),
     });
 
@@ -136,8 +136,8 @@ void main() {
       Polyline(
         polylineId: const PolylineId('route-basic'),
         points: const [
-          LatLng(31.2304, 121.4737),
-          LatLng(31.2500, 121.4900),
+          LatLng(31.2204, 121.4657),
+          LatLng(31.2404, 121.4817),
         ],
         color: Colors.blue,
         width: 10,
@@ -148,10 +148,10 @@ void main() {
       Polyline(
         polylineId: const PolylineId('route-multi'),
         points: const [
-          LatLng(31.2100, 121.4400),
-          LatLng(31.2304, 121.4737),
-          LatLng(31.2500, 121.4900),
-          LatLng(31.2700, 121.5100),
+          LatLng(31.2164, 121.4657),
+          LatLng(31.2384, 121.4697),
+          LatLng(31.2184, 121.4787),
+          LatLng(31.2424, 121.4827),
         ],
         color: Colors.red,
         width: 10,
@@ -163,10 +163,10 @@ void main() {
       Polygon(
         polygonId: const PolygonId('area-basic'),
         points: const [
-          LatLng(31.2200, 121.4500),
-          LatLng(31.2400, 121.4500),
-          LatLng(31.2400, 121.4900),
-          LatLng(31.2200, 121.4900),
+          LatLng(31.2229, 121.4677),
+          LatLng(31.2379, 121.4677),
+          LatLng(31.2379, 121.4797),
+          LatLng(31.2229, 121.4797),
         ],
         fillColor: const Color(0x800066CC),
         strokeColor: Colors.blue,
@@ -178,9 +178,9 @@ void main() {
       Polygon(
         polygonId: const PolygonId('area-triangle'),
         points: const [
-          LatLng(31.2450, 121.4737),
-          LatLng(31.2200, 121.4550),
-          LatLng(31.2200, 121.4920),
+          LatLng(31.2404, 121.4737),
+          LatLng(31.2204, 121.4637),
+          LatLng(31.2204, 121.4837),
         ],
         fillColor: const Color(0x60FF6600),
         strokeColor: Colors.orange,
@@ -193,7 +193,7 @@ void main() {
       Circle(
         circleId: const CircleId('circle-basic'),
         center: const LatLng(31.2304, 121.4737),
-        radius: 1000,
+        radius: 300,
         fillColor: const Color(0x80FF0000),
         strokeColor: Colors.red,
         strokeWidth: 4,
@@ -214,7 +214,7 @@ void main() {
           polylineId: const PolylineId('route'),
           points: const [
             LatLng(31.2304, 121.4737),
-            LatLng(31.2500, 121.4900),
+            LatLng(31.2404, 121.4817),
           ],
           color: Colors.green,
           width: 6,
@@ -224,7 +224,7 @@ void main() {
         Circle(
           circleId: const CircleId('buffer'),
           center: const LatLng(31.2304, 121.4737),
-          radius: 500,
+          radius: 200,
           fillColor: const Color(0x6000CC66),
           strokeColor: Colors.green,
           strokeWidth: 3,
@@ -244,7 +244,7 @@ void main() {
     await shoot('marker_update_after', markers: {
       Marker(
         markerId: const MarkerId('dynamic'),
-        position: const LatLng(31.2500, 121.4900),
+        position: const LatLng(31.2404, 121.4817),
       ),
     });
   });
