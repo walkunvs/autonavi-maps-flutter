@@ -239,9 +239,8 @@ jobs:
             cd example
             echo "=== running flutter drive ===" >> "$LOG"
             DRIVE_RESULT=0
-            flutter drive \
-              --driver=test_driver/integration_test.dart \
-              --target=integration_test/map_rendering_test.dart \
+            flutter test \
+              integration_test/map_rendering_test.dart \
               -d emulator-5554 \
               "--dart-define=AMAP_ANDROID_KEY=${{ secrets.AMAP_ANDROID_KEY }}" \
               >> "$LOG" 2>&1 || DRIVE_RESULT=$?

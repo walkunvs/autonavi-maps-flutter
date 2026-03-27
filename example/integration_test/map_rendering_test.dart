@@ -114,7 +114,11 @@ void main() {
       await Future.delayed(_overlayUpdateDelay);
       await tester.pump();
       if (Platform.isAndroid) {
-        await _screenshotChannel.invokeMethod<String>('captureAndSave', name);
+        try {
+          await _screenshotChannel.invokeMethod<String>('captureAndSave', name);
+        } catch (e) {
+          debugPrint('Warning: screenshot $name failed: $e');
+        }
       } else {
         await binding.takeScreenshot(name);
       }
