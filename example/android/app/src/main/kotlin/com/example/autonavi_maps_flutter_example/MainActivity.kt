@@ -42,44 +42,58 @@ class MainActivity : FlutterActivity() {
             return
         }
 
-        val view = window.decorView
-        val w = view.width
-        val h = view.height
-        if (w <= 0 || h <= 0) {
-            Log.w(TAG, "View not laid out yet (${w}x${h}), skipping $name")
+        // Any Throwable here (OutOfMemoryError, NullPointerException, etc.) must
+        // call result.success(null) — otherwise the Dart side hangs forever.
+        val bitmap: Bitmap
+        try {
+            val view = window.decorView
+            val w = view.width
+            val h = view.height
+            if (w <= 0 || h <= 0) {
+                Log.w(TAG, "View not laid out yet (${w}x${h}), skipping $name")
+                result.success(null)
+                return
+            }
+            bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+        } catch (e: Throwable) {
+            Log.e(TAG, "Setup error for $name: ${e.message}")
             result.success(null)
             return
         }
 
-        val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-
-        PixelCopy.request(
-            window,
-            bitmap,
-            { copyResult ->
-                if (copyResult == PixelCopy.SUCCESS) {
-                    try {
-                        val base = getExternalFilesDir(null) ?: filesDir
-                        val dir = File(base, "screenshots").also { it.mkdirs() }
-                        val file = File(dir, "$name.png")
-                        FileOutputStream(file).use { out ->
-                            bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
+        try {
+            PixelCopy.request(
+                window,
+                bitmap,
+                { copyResult ->
+                    if (copyResult == PixelCopy.SUCCESS) {
+                        try {
+                            val base = getExternalFilesDir(null) ?: filesDir
+                            val dir = File(base, "screenshots").also { it.mkdirs() }
+                            val file = File(dir, "$name.png")
+                            FileOutputStream(file).use { out ->
+                                bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
+                            }
+                            Log.i(TAG, "Saved $name → ${file.absolutePath}")
+                            result.success(file.absolutePath)
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Save failed for $name: ${e.message}")
+                            result.success(null)
+                        } finally {
+                            bitmap.recycle()
                         }
-                        Log.i(TAG, "Saved $name → ${file.absolutePath}")
-                        result.success(file.absolutePath)
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Save failed for $name: ${e.message}")
-                        result.success(null) // don't fail the test
-                    } finally {
+                    } else {
                         bitmap.recycle()
+                        Log.e(TAG, "PixelCopy failed for $name: code=$copyResult")
+                        result.success(null)
                     }
-                } else {
-                    bitmap.recycle()
-                    Log.e(TAG, "PixelCopy failed for $name: code=$copyResult")
-                    result.success(null) // don't fail the test
-                }
-            },
-            Handler(Looper.getMainLooper()),
-        )
+                },
+                Handler(Looper.getMainLooper()),
+            )
+        } catch (e: Throwable) {
+            bitmap.recycle()
+            Log.e(TAG, "PixelCopy.request error for $name: ${e.message}")
+            result.success(null)
+        }
     }
 }

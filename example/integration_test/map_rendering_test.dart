@@ -115,7 +115,11 @@ void main() {
       await tester.pump();
       if (Platform.isAndroid) {
         try {
-          await _screenshotChannel.invokeMethod<String>('captureAndSave', name);
+          // 5 s timeout: if the Kotlin side never calls result (e.g. due to an
+          // uncaught Error), this prevents the test from hanging indefinitely.
+          await _screenshotChannel
+              .invokeMethod<String>('captureAndSave', name)
+              .timeout(const Duration(seconds: 5), onTimeout: () => null);
         } catch (e) {
           debugPrint('Warning: screenshot $name failed: $e');
         }

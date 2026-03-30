@@ -223,9 +223,19 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
+      - name: Build debug APK (catches Gradle / Kotlin errors before emulator starts)
+        id: apk_build
+        if: steps.melos.outcome == 'success'
+        working-directory: example
+        run: |
+          flutter build apk --debug \
+            "--dart-define=AMAP_ANDROID_KEY=${{ secrets.AMAP_ANDROID_KEY }}" \
+            2>&1 | tee /tmp/apk-build.log; exit ${PIPESTATUS[0]}
+        continue-on-error: true
+
       - name: Run integration tests on Android Emulator
         id: test
-        if: steps.melos.outcome == 'success'
+        if: steps.apk_build.outcome == 'success'
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 33
@@ -235,16 +245,18 @@ jobs:
           script: |
             LOG=/tmp/integration-android.log
             touch "$LOG"
+            set -x
+            adb devices >> "$LOG" 2>&1
             echo "=== pwd: $(pwd)" >> "$LOG"
             cd example
-            echo "=== running flutter drive ===" >> "$LOG"
+            echo "=== running flutter test ===" >> "$LOG"
             DRIVE_RESULT=0
             flutter test \
               integration_test/map_rendering_test.dart \
               -d emulator-5554 \
               "--dart-define=AMAP_ANDROID_KEY=${{ secrets.AMAP_ANDROID_KEY }}" \
               >> "$LOG" 2>&1 || DRIVE_RESULT=$?
-            echo "=== flutter drive exit=$DRIVE_RESULT ===" >> "$LOG"
+            echo "=== flutter test exit=$DRIVE_RESULT ===" >> "$LOG"
             mkdir -p integration_test/screenshots
             adb pull \
               /sdcard/Android/data/com.example.autonavi_maps_flutter_example/files/screenshots/. \
@@ -253,11 +265,21 @@ jobs:
             exit $DRIVE_RESULT
         continue-on-error: true
 
+      - name: Upload APK build log
+        uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: log-apk-build
+          path: /tmp/apk-build.log
+          if-no-files-found: ignore
+
       - name: Capture job status
         id: capture
         if: always()
         run: |
           if [[ "${{ steps.melos.outcome }}" == "failure" ]]; then
+            echo "status=failure" >> $GITHUB_OUTPUT
+          elif [[ "${{ steps.apk_build.outcome }}" == "failure" ]]; then
             echo "status=failure" >> $GITHUB_OUTPUT
           else
             echo "status=${{ steps.test.outcome }}" >> $GITHUB_OUTPUT

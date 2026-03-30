@@ -107,6 +107,12 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
+      - name: Build debug APK (catches Gradle / Kotlin errors before emulator starts)
+        working-directory: example
+        run: |
+          flutter build apk --debug \
+            "--dart-define=AMAP_ANDROID_KEY=${{ secrets.AMAP_ANDROID_KEY }}"
+
       - name: Run integration tests on Android Emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
@@ -115,6 +121,8 @@ jobs:
           arch: x86_64
           profile: Nexus 6
           script: |
+            set -x
+            adb devices
             cd example
             DRIVE_RESULT=0
             flutter test \
