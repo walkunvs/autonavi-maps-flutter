@@ -113,6 +113,28 @@ jobs:
           flutter build apk --debug \
             "--dart-define=AMAP_ANDROID_KEY=${{ secrets.AMAP_ANDROID_KEY }}"
 
+      - name: Write Android test runner
+        run: |
+          cat > /tmp/android_test.sh << 'SCRIPT_EOF'
+          #!/bin/sh
+          # android-emulator-runner@v2 runs each line of script: as a separate
+          # /usr/bin/sh -c invocation, so variables and cd don't survive between
+          # lines.  This file is executed as a single process — state persists.
+          set -x
+          cd "$GITHUB_WORKSPACE/example"
+          DRIVE_RESULT=0
+          flutter test integration_test/map_rendering_test.dart \
+            -d emulator-5554 \
+            "--dart-define=AMAP_ANDROID_KEY=${{ secrets.AMAP_ANDROID_KEY }}" \
+            || DRIVE_RESULT=$?
+          mkdir -p integration_test/screenshots
+          adb pull \
+            /sdcard/Android/data/com.example.autonavi_maps_flutter_example/files/screenshots/. \
+            integration_test/screenshots/ || true
+          exit $DRIVE_RESULT
+          SCRIPT_EOF
+          chmod +x /tmp/android_test.sh
+
       - name: Run integration tests on Android Emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
@@ -120,21 +142,7 @@ jobs:
           target: google_apis
           arch: x86_64
           profile: Nexus 6
-          script: |
-            set -x
-            adb devices
-            cd example
-            DRIVE_RESULT=0
-            flutter test \
-              integration_test/map_rendering_test.dart \
-              -d emulator-5554 \
-              "--dart-define=AMAP_ANDROID_KEY=${{ secrets.AMAP_ANDROID_KEY }}" \
-              || DRIVE_RESULT=$?
-            mkdir -p integration_test/screenshots
-            adb pull \
-              /sdcard/Android/data/com.example.autonavi_maps_flutter_example/files/screenshots/. \
-              integration_test/screenshots/ || true
-            exit $DRIVE_RESULT
+          script: /tmp/android_test.sh
 
       - name: Upload screenshots artifact
         uses: actions/upload-artifact@v6

@@ -233,6 +233,35 @@ jobs:
             2>&1 | tee /tmp/apk-build.log; exit ${PIPESTATUS[0]}
         continue-on-error: true
 
+      - name: Write Android test runner
+        if: steps.apk_build.outcome == 'success'
+        run: |
+          cat > /tmp/android_test.sh << 'SCRIPT_EOF'
+          #!/bin/sh
+          # android-emulator-runner@v2 runs each line of script: as a separate
+          # /usr/bin/sh -c invocation, so variables and cd don't survive between
+          # lines.  This file is executed as a single process — state persists.
+          LOG=/tmp/integration-android.log
+          touch "$LOG"
+          set -x
+          adb devices >> "$LOG" 2>&1
+          echo "=== running flutter test ===" >> "$LOG"
+          cd "$GITHUB_WORKSPACE/example"
+          DRIVE_RESULT=0
+          flutter test integration_test/map_rendering_test.dart \
+            -d emulator-5554 \
+            "--dart-define=AMAP_ANDROID_KEY=${{ secrets.AMAP_ANDROID_KEY }}" \
+            >> "$LOG" 2>&1 || DRIVE_RESULT=$?
+          echo "=== flutter test exit=$DRIVE_RESULT ===" >> "$LOG"
+          mkdir -p integration_test/screenshots
+          adb pull \
+            /sdcard/Android/data/com.example.autonavi_maps_flutter_example/files/screenshots/. \
+            integration_test/screenshots/ >> "$LOG" 2>&1 || true
+          echo "=== done ===" >> "$LOG"
+          exit $DRIVE_RESULT
+          SCRIPT_EOF
+          chmod +x /tmp/android_test.sh
+
       - name: Run integration tests on Android Emulator
         id: test
         if: steps.apk_build.outcome == 'success'
@@ -242,27 +271,7 @@ jobs:
           target: google_apis
           arch: x86_64
           profile: Nexus 6
-          script: |
-            LOG=/tmp/integration-android.log
-            touch "$LOG"
-            set -x
-            adb devices >> "$LOG" 2>&1
-            echo "=== pwd: $(pwd)" >> "$LOG"
-            cd example
-            echo "=== running flutter test ===" >> "$LOG"
-            DRIVE_RESULT=0
-            flutter test \
-              integration_test/map_rendering_test.dart \
-              -d emulator-5554 \
-              "--dart-define=AMAP_ANDROID_KEY=${{ secrets.AMAP_ANDROID_KEY }}" \
-              >> "$LOG" 2>&1 || DRIVE_RESULT=$?
-            echo "=== flutter test exit=$DRIVE_RESULT ===" >> "$LOG"
-            mkdir -p integration_test/screenshots
-            adb pull \
-              /sdcard/Android/data/com.example.autonavi_maps_flutter_example/files/screenshots/. \
-              integration_test/screenshots/ >> "$LOG" 2>&1 || true
-            echo "=== done ===" >> "$LOG"
-            exit $DRIVE_RESULT
+          script: /tmp/android_test.sh
         continue-on-error: true
 
       - name: Upload APK build log
