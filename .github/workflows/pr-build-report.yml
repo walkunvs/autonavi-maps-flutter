@@ -239,12 +239,14 @@ jobs:
           cat > /tmp/android_test.sh << 'SCRIPT_EOF'
           #!/bin/sh
           # android-emulator-runner@v2 runs each line of script: as a separate
-          # /usr/bin/sh -c invocation, so variables and cd don't survive between
-          # lines.  This file is executed as a single process — state persists.
+          # /usr/bin/sh -c invocation — this file runs as a single process so
+          # variables and cd changes persist throughout.
           LOG=/tmp/integration-android.log
           touch "$LOG"
           set -x
           adb devices >> "$LOG" 2>&1
+          adb logcat -s "ScreenshotChannel" -v time > /tmp/logcat-screenshot.txt &
+          LOGCAT_PID=$!
           echo "=== running flutter test ===" >> "$LOG"
           cd "$GITHUB_WORKSPACE/example"
           DRIVE_RESULT=0
@@ -253,6 +255,9 @@ jobs:
             "--dart-define=AMAP_ANDROID_KEY=${{ secrets.AMAP_ANDROID_KEY }}" \
             >> "$LOG" 2>&1 || DRIVE_RESULT=$?
           echo "=== flutter test exit=$DRIVE_RESULT ===" >> "$LOG"
+          kill $LOGCAT_PID 2>/dev/null || true
+          adb shell ls -la /sdcard/Android/data/com.example.autonavi_maps_flutter_example/files/ >> "$LOG" 2>&1 || true
+          adb shell ls -la /sdcard/Android/data/com.example.autonavi_maps_flutter_example/files/screenshots/ >> "$LOG" 2>&1 || true
           mkdir -p integration_test/screenshots
           adb pull \
             /sdcard/Android/data/com.example.autonavi_maps_flutter_example/files/screenshots/. \
@@ -280,6 +285,14 @@ jobs:
         with:
           name: log-apk-build
           path: /tmp/apk-build.log
+          if-no-files-found: ignore
+
+      - name: Upload ScreenshotChannel logcat
+        uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: logcat-screenshot-channel
+          path: /tmp/logcat-screenshot.txt
           if-no-files-found: ignore
 
       - name: Capture job status

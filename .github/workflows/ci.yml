@@ -118,15 +118,22 @@ jobs:
           cat > /tmp/android_test.sh << 'SCRIPT_EOF'
           #!/bin/sh
           # android-emulator-runner@v2 runs each line of script: as a separate
-          # /usr/bin/sh -c invocation, so variables and cd don't survive between
-          # lines.  This file is executed as a single process — state persists.
+          # /usr/bin/sh -c invocation — this file runs as a single process so
+          # variables and cd changes persist throughout.
           set -x
+          # Capture ScreenshotChannel logcat in background
+          adb logcat -s "ScreenshotChannel" -v time > /tmp/logcat-screenshot.txt &
+          LOGCAT_PID=$!
           cd "$GITHUB_WORKSPACE/example"
           DRIVE_RESULT=0
           flutter test integration_test/map_rendering_test.dart \
             -d emulator-5554 \
             "--dart-define=AMAP_ANDROID_KEY=${{ secrets.AMAP_ANDROID_KEY }}" \
             || DRIVE_RESULT=$?
+          kill $LOGCAT_PID 2>/dev/null || true
+          # Show what exists on the device for diagnosis
+          adb shell ls -la /sdcard/Android/data/com.example.autonavi_maps_flutter_example/files/ || true
+          adb shell ls -la /sdcard/Android/data/com.example.autonavi_maps_flutter_example/files/screenshots/ || true
           mkdir -p integration_test/screenshots
           adb pull \
             /sdcard/Android/data/com.example.autonavi_maps_flutter_example/files/screenshots/. \
@@ -143,6 +150,14 @@ jobs:
           arch: x86_64
           profile: Nexus 6
           script: /tmp/android_test.sh
+
+      - name: Upload logcat artifact
+        uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: logcat-screenshot-channel
+          path: /tmp/logcat-screenshot.txt
+          if-no-files-found: ignore
 
       - name: Upload screenshots artifact
         uses: actions/upload-artifact@v6
