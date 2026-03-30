@@ -120,24 +120,35 @@ jobs:
           # android-emulator-runner@v2 runs each line of script: as a separate
           # /usr/bin/sh -c invocation — this file runs as a single process so
           # variables and cd changes persist throughout.
-          set -x
-          # Capture ScreenshotChannel logcat in background
+          #
+          # Screenshot mechanism: the test app writes screenshot_request.txt to
+          # its external files dir; this loop detects it, calls adb screencap,
+          # then writes screenshot_done.txt so the app can continue.
+          PKG_FILES="/sdcard/Android/data/com.example.autonavi_maps_flutter_example/files"
+          SCREENSHOTS="$GITHUB_WORKSPACE/example/integration_test/screenshots"
+          mkdir -p "$SCREENSHOTS"
           adb logcat -s "ScreenshotChannel" -v time > /tmp/logcat-screenshot.txt &
           LOGCAT_PID=$!
+          # Start screenshot monitor in background
+          while true; do
+            NAME=$(adb shell "cat $PKG_FILES/screenshot_request.txt 2>/dev/null" | tr -d '\r\n ')
+            if [ -n "$NAME" ]; then
+              adb shell "rm $PKG_FILES/screenshot_request.txt 2>/dev/null" || true
+              adb exec-out screencap -p > "$SCREENSHOTS/$NAME.png"
+              adb shell "touch $PKG_FILES/screenshot_done.txt" || true
+              echo "Captured: $NAME"
+            fi
+            sleep 0.3
+          done &
+          MONITOR_PID=$!
           cd "$GITHUB_WORKSPACE/example"
           DRIVE_RESULT=0
           flutter test integration_test/map_rendering_test.dart \
             -d emulator-5554 \
             "--dart-define=AMAP_ANDROID_KEY=${{ secrets.AMAP_ANDROID_KEY }}" \
             || DRIVE_RESULT=$?
-          kill $LOGCAT_PID 2>/dev/null || true
-          # Show what exists on the device for diagnosis
-          adb shell ls -la /sdcard/Android/data/com.example.autonavi_maps_flutter_example/files/ || true
-          adb shell ls -la /sdcard/Android/data/com.example.autonavi_maps_flutter_example/files/screenshots/ || true
-          mkdir -p integration_test/screenshots
-          adb pull \
-            /sdcard/Android/data/com.example.autonavi_maps_flutter_example/files/screenshots/. \
-            integration_test/screenshots/ || true
+          kill $MONITOR_PID 2>/dev/null || true
+          kill $LOGCAT_PID  2>/dev/null || true
           exit $DRIVE_RESULT
           SCRIPT_EOF
           chmod +x /tmp/android_test.sh

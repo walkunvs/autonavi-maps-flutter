@@ -119,7 +119,7 @@ void main() {
           // uncaught Error), this prevents the test from hanging indefinitely.
           await _screenshotChannel
               .invokeMethod<String>('captureAndSave', name)
-              .timeout(const Duration(seconds: 5), onTimeout: () => null);
+              .timeout(const Duration(seconds: 15), onTimeout: () => null);
         } catch (e) {
           debugPrint('Warning: screenshot $name failed: $e');
         }
