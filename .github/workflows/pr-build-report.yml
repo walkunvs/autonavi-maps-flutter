@@ -233,6 +233,16 @@ jobs:
             2>&1 | tee /tmp/apk-build.log; exit ${PIPESTATUS[0]}
         continue-on-error: true
 
+      - name: Print debug keystore SHA1 (register this in AMap console → Android Key)
+        if: steps.apk_build.outcome == 'success'
+        run: |
+          keytool -list -v \
+            -keystore "$HOME/.android/debug.keystore" \
+            -alias androiddebugkey \
+            -storepass android \
+            -keypass android 2>&1 \
+            | grep -E "SHA1|SHA256|MD5|Owner|Issuer" || true
+
       - name: Write Android test runner
         if: steps.apk_build.outcome == 'success'
         run: |
@@ -251,7 +261,7 @@ jobs:
           SCREENSHOTS="$GITHUB_WORKSPACE/example/integration_test/screenshots"
           mkdir -p "$SCREENSHOTS"
           adb devices >> "$LOG" 2>&1
-          adb logcat -s "ScreenshotChannel" -v time > /tmp/logcat-screenshot.txt &
+          adb logcat -s "ScreenshotChannel,AMap,AMap_*,com.amap*,AMAP*" -v time > /tmp/logcat-screenshot.txt &
           LOGCAT_PID=$!
           # Start screenshot monitor in background
           while true; do
