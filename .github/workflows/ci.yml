@@ -107,6 +107,12 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
+      - name: Restore fixed CI debug keystore
+        run: |
+          mkdir -p "$HOME/.android"
+          echo "${{ secrets.ANDROID_DEBUG_KEYSTORE_BASE64 }}" \
+            | base64 -d > "$HOME/.android/debug.keystore"
+
       - name: Build debug APK (catches Gradle / Kotlin errors before emulator starts)
         working-directory: example
         run: |
