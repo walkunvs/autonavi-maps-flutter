@@ -26,9 +26,11 @@ import 'package:autonavi_maps_flutter/autonavi_maps_flutter.dart';
 import 'test_app/map_test_app.dart';
 
 // How long to wait for the AMap SDK to initialise on first launch and for
-// map tiles to finish loading.  10 s gives slower GitHub Actions runners
-// enough time to fetch and render the initial tile set.
-const _mapInitDelay = Duration(seconds: 10);
+// map tiles to finish loading.  Android emulators are slower to start the
+// OpenGL surface; give them 20 s, iOS Simulator 10 s.
+final _mapInitDelay = Platform.isAndroid
+    ? const Duration(seconds: 20)
+    : const Duration(seconds: 10);
 
 // How long to wait after updating overlays before taking a screenshot.
 // The update travels: Dart setState → platform channel → native SDK render.

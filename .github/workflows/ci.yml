@@ -139,8 +139,13 @@ jobs:
           PKG_FILES="/sdcard/Android/data/com.example.autonavi_maps_flutter_example/files"
           SCREENSHOTS="$GITHUB_WORKSPACE/example/integration_test/screenshots"
           mkdir -p "$SCREENSHOTS"
-          adb logcat -s "ScreenshotChannel,AMap,AMap_*,com.amap*,AMAP*" -v time > /tmp/logcat-screenshot.txt &
+          # Capture full logcat (AMap tile errors appear under various tags)
+          adb logcat -v time > /tmp/logcat-full.txt &
           LOGCAT_PID=$!
+          # Diagnose: can the emulator reach AMap tile servers?
+          echo "=== AMap network connectivity test ==="
+          adb shell "curl -s -o /dev/null -w 'HTTP %{http_code}' --connect-timeout 10 https://webrd01.is.autonavi.com/ 2>&1 || echo FAILED"
+          echo "=== end connectivity test ==="
           # Start screenshot monitor in background
           while true; do
             NAME=$(adb shell "cat $PKG_FILES/screenshot_request.txt 2>/dev/null" | tr -d '\r\n ')
@@ -178,8 +183,8 @@ jobs:
         uses: actions/upload-artifact@v6
         if: always()
         with:
-          name: logcat-screenshot-channel
-          path: /tmp/logcat-screenshot.txt
+          name: logcat-full
+          path: /tmp/logcat-full.txt
           if-no-files-found: ignore
 
       - name: Upload screenshots artifact
