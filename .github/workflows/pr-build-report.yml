@@ -234,6 +234,8 @@ jobs:
         id: apk_build
         if: steps.melos.outcome == 'success'
         working-directory: example
+        env:
+          AMAP_API_KEY: ${{ secrets.AMAP_ANDROID_KEY }}
         run: |
           flutter build apk --debug \
             "--dart-define=AMAP_ANDROID_KEY=${{ secrets.AMAP_ANDROID_KEY }}" \
@@ -287,6 +289,7 @@ jobs:
           MONITOR_PID=$!
           echo "=== running flutter test ===" >> "$LOG"
           cd "$GITHUB_WORKSPACE/example"
+          export AMAP_API_KEY="${{ secrets.AMAP_ANDROID_KEY }}"
           DRIVE_RESULT=0
           flutter test integration_test/map_rendering_test.dart \
             -d emulator-5554 \
