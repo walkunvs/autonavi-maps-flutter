@@ -10,7 +10,6 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:autonavi_maps_flutter/autonavi_maps_flutter.dart';
 
 const _iosKey = String.fromEnvironment('AMAP_IOS_KEY', defaultValue: '');
@@ -50,13 +49,6 @@ class MapTestApp extends StatefulWidget {
 }
 
 class _MapTestAppState extends State<MapTestApp> {
-  @override
-  void initState() {
-    super.initState();
-    // Hide status bar and navigation bar for cleaner screenshots.
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
-  }
-
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
