@@ -236,12 +236,17 @@ jobs:
       - name: Print debug keystore SHA1 (register this in AMap console → Android Key)
         if: steps.apk_build.outcome == 'success'
         run: |
-          keytool -list -v \
-            -keystore "$HOME/.android/debug.keystore" \
-            -alias androiddebugkey \
-            -storepass android \
-            -keypass android 2>&1 \
-            | grep -E "SHA1|SHA256|MD5|Owner|Issuer" || true
+          KEYSTORE="$HOME/.android/debug.keystore"
+          if [ ! -f "$KEYSTORE" ]; then
+            echo "debug.keystore not found at $KEYSTORE"
+            ls -la "$HOME/.android/" 2>/dev/null || echo "~/.android/ does not exist"
+          else
+            keytool -list -v \
+              -keystore "$KEYSTORE" \
+              -alias androiddebugkey \
+              -storepass android \
+              -keypass android 2>&1 || true
+          fi
 
       - name: Write Android test runner
         if: steps.apk_build.outcome == 'success'
