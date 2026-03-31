@@ -236,16 +236,14 @@ jobs:
       - name: Print debug keystore SHA1 (register this in AMap console → Android Key)
         if: steps.apk_build.outcome == 'success'
         run: |
-          KEYSTORE="$HOME/.android/debug.keystore"
-          if [ ! -f "$KEYSTORE" ]; then
-            echo "debug.keystore not found at $KEYSTORE"
-            ls -la "$HOME/.android/" 2>/dev/null || echo "~/.android/ does not exist"
+          APK="example/build/app/outputs/flutter-apk/app-debug.apk"
+          if [ ! -f "$APK" ]; then
+            echo "APK not found: $APK"
           else
-            keytool -list -v \
-              -keystore "$KEYSTORE" \
-              -alias androiddebugkey \
-              -storepass android \
-              -keypass android 2>&1 || true
+            echo "=== Certificate fingerprints from APK ==="
+            BUILD_TOOLS=$(ls -1 "$ANDROID_HOME/build-tools/" | sort -V | tail -1)
+            "$ANDROID_HOME/build-tools/$BUILD_TOOLS/apksigner" verify \
+              --print-certs "$APK" 2>&1 || true
           fi
 
       - name: Write Android test runner
