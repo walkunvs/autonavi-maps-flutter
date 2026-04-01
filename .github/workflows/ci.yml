@@ -127,10 +127,14 @@ jobs:
           if [ ! -f "$APK" ]; then
             echo "APK not found: $APK"
           else
-            echo "=== Certificate fingerprints from APK ==="
             BUILD_TOOLS=$(ls -1 "$ANDROID_HOME/build-tools/" | sort -V | tail -1)
+            echo "=== Certificate fingerprints from APK ==="
             "$ANDROID_HOME/build-tools/$BUILD_TOOLS/apksigner" verify \
               --print-certs "$APK" 2>&1 || true
+            echo "=== AMAP_API_KEY embedded in manifest ==="
+            "$ANDROID_HOME/build-tools/$BUILD_TOOLS/aapt" dump xmltree \
+              "$APK" AndroidManifest.xml 2>&1 \
+              | grep -A2 "apikey" || echo "(not found)"
           fi
 
       - name: Write Android test runner
@@ -152,7 +156,7 @@ jobs:
           LOGCAT_PID=$!
           # Diagnose: can the emulator reach AMap tile servers?
           echo "=== AMap network connectivity test ==="
-          adb shell "curl -s -o /dev/null -w 'HTTP %{http_code}' --connect-timeout 10 https://webrd01.is.autonavi.com/ 2>&1 || echo FAILED"
+          adb shell ping -c 3 webrd01.is.autonavi.com 2>&1 || echo "PING FAILED"
           echo "=== end connectivity test ==="
           # Start screenshot monitor in background
           while true; do
@@ -188,12 +192,27 @@ jobs:
           profile: Nexus 6
           script: /tmp/android_test.sh
 
+      - name: Extract AMap lines from logcat
+        if: always()
+        run: |
+          grep -i -E "amap|autonavi|apikey|tile|mapcore|AMapEx|auth|verify" \
+            /tmp/logcat-full.txt > /tmp/logcat-amap.txt 2>/dev/null \
+            || echo "(no matches)" > /tmp/logcat-amap.txt
+
       - name: Upload logcat artifact
         uses: actions/upload-artifact@v6
         if: always()
         with:
           name: logcat-full
           path: /tmp/logcat-full.txt
+          if-no-files-found: ignore
+
+      - name: Upload AMap logcat artifact
+        uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: logcat-amap
+          path: /tmp/logcat-amap.txt
           if-no-files-found: ignore
 
       - name: Upload screenshots artifact
