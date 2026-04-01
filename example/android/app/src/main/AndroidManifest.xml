@@ -9,6 +9,14 @@
             android:name="com.amap.api.v2.apikey"
             android:value="${AMAP_API_KEY}"/>
 
+        <!-- Disable Impeller (Vulkan) so Flutter uses Skia/OpenGL ES, which is
+             compatible with AMap SDK's OpenGL ES rendering on emulators.
+             Impeller + AMap causes "bad color buffer handle" on gfxstream,
+             resulting in black map tiles. -->
+        <meta-data
+            android:name="io.flutter.embedding.android.EnableImpeller"
+            android:value="false"/>
+
         <activity
             android:name=".MainActivity"
             android:exported="true"

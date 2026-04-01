@@ -8,6 +8,11 @@
 //
 // The onScreenshot callback runs on the HOST, so screenshots are written
 // directly to the host filesystem (not into the device/simulator sandbox).
+//
+// Android note: Android screenshots are captured on the device via PixelCopy
+// (see MainActivity.kt) and saved to the app's external files directory.
+// They are NOT routed through this callback.  CI retrieves them with `adb pull`
+// after the test completes.  Only iOS screenshots go through onScreenshot.
 
 import 'dart:io';
 

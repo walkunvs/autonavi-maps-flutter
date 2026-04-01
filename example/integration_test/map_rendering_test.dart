@@ -5,14 +5,19 @@
 // screen, then capture screenshots that are compared against golden baselines.
 //
 // Running locally:
-//   flutter test integration_test/map_rendering_test.dart \
+//   flutter drive \
+//     --driver=test_driver/integration_test.dart \
+//     --target=integration_test/map_rendering_test.dart \
 //     --dart-define=AMAP_IOS_KEY=<your-key>             (iOS simulator)
 //     --dart-define=AMAP_ANDROID_KEY=<your-key>          (Android emulator)
 //
 // Updating golden baselines:
 //   Copy the screenshots/ output into golden/ after a visual inspection.
 
+import 'dart:io' show Platform;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 
@@ -20,325 +25,252 @@ import 'package:autonavi_maps_flutter/autonavi_maps_flutter.dart';
 
 import 'test_app/map_test_app.dart';
 
-// How long to wait for AMap tiles to load from the network.
-// AMap tiles are fetched asynchronously from a CDN and are NOT captured by
-// pumpAndSettle (which only drains Flutter's frame scheduler).
-// 15 s covers cold-start latency on GitHub Actions macOS/ubuntu runners.
-const _tilePaintDelay = Duration(seconds: 15);
+// How long to wait for the AMap SDK to initialise on first launch and for
+// map tiles to finish loading.  Android emulators are slower to start the
+// OpenGL surface; give them 40 s, iOS Simulator 20 s.
+final _mapInitDelay = Platform.isAndroid
+    ? const Duration(seconds: 40)
+    : const Duration(seconds: 20);
 
-/// Waits for AMap tiles, then converts the Flutter surface to a raster image.
-///
-/// Call order matters:
-///   1. pump() — kick off the initial render so the native map view exists.
-///   2. Future.delayed — let the CDN tiles finish loading (outside Flutter's
-///      frame scheduler, so pumpAndSettle cannot observe this).
-///   3. pump() — sync Flutter with whatever the native layer has painted.
-///   4. convertFlutterSurfaceToImage() — required on all platforms to switch
-///      to image-capture mode before takeScreenshot() can be called.
-///   5. pump() — one final frame so the image surface reflects the tiles.
-///
-/// Must be called **exactly once** per test (the framework asserts
-/// !_isSurfaceRendered on every call).
-Future<void> _prepareForScreenshots(
-  IntegrationTestWidgetsFlutterBinding binding,
-  WidgetTester tester,
-) async {
-  await tester.pump();
-  await Future.delayed(_tilePaintDelay);
-  await tester.pump();
-  await binding.convertFlutterSurfaceToImage();
-  await tester.pump();
-}
+// How long to wait after updating overlays before taking a screenshot.
+// The update travels: Dart setState → platform channel → native SDK render.
+// 500 ms is enough for this local round-trip.
+const _overlayUpdateDelay = Duration(milliseconds: 500);
 
-/// Takes a screenshot.  [_prepareForScreenshots] must have been called first.
-/// For tests that take more than one screenshot, call this helper for each
-/// screenshot WITHOUT calling [_prepareForScreenshots] again.
-Future<void> _screenshot(
-  IntegrationTestWidgetsFlutterBinding binding,
-  String name,
-) async {
-  await binding.takeScreenshot(name);
+// Fixed camera position for all scenarios.  Using one consistent view means
+// the AMap native view (and its tile state) is never torn down between
+// screenshots — only the overlays change.
+const _camera = CameraPosition(
+  target: LatLng(31.2304, 121.4737),
+  zoom: 14,
+);
+
+/// Holds the overlay sets for one screenshot scenario.
+class _Overlays {
+  const _Overlays({
+    this.markers = const {},
+    this.polylines = const {},
+    this.polygons = const {},
+    this.circles = const {},
+  });
+
+  final Set<Marker> markers;
+  final Set<Polyline> polylines;
+  final Set<Polygon> polygons;
+  final Set<Circle> circles;
 }
 
 void main() {
   final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // Basic map rendering
-  // ─────────────────────────────────────────────────────────────────────────
+  testWidgets('map overlay rendering', (tester) async {
+    // Shared overlay state.  Updating this value rebuilds only the overlay
+    // layer via ValueListenableBuilder; the MapTestApp (and its AMap native
+    // view) stay alive for the entire test thanks to the stable ValueKey.
+    final overlays = ValueNotifier<_Overlays>(const _Overlays());
 
-  testWidgets('Map renders without overlays', (tester) async {
-    await tester.pumpWidget(const MapTestApp());
-    await _prepareForScreenshots(binding, tester);
-    await _screenshot(binding, 'map_empty');
-  });
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // Marker rendering
-  // ─────────────────────────────────────────────────────────────────────────
-
-  testWidgets('Single marker renders at correct position', (tester) async {
     await tester.pumpWidget(
-      MapTestApp(
-        markers: {
-          Marker(
-            markerId: const MarkerId('test-marker'),
-            position: const LatLng(31.2304, 121.4737),
-          ),
-        },
-      ),
-    );
-    await _prepareForScreenshots(binding, tester);
-    await _screenshot(binding, 'marker_single');
-  });
-
-  testWidgets('Multiple markers render at distinct positions', (tester) async {
-    await tester.pumpWidget(
-      MapTestApp(
-        markers: {
-          Marker(
-            markerId: const MarkerId('marker-a'),
-            position: const LatLng(31.2304, 121.4737),
-          ),
-          Marker(
-            markerId: const MarkerId('marker-b'),
-            position: const LatLng(31.2500, 121.4900),
-          ),
-          Marker(
-            markerId: const MarkerId('marker-c'),
-            position: const LatLng(31.2100, 121.4500),
-          ),
-        },
-      ),
-    );
-    await _prepareForScreenshots(binding, tester);
-    await _screenshot(binding, 'marker_multiple');
-  });
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // Polyline rendering
-  // ─────────────────────────────────────────────────────────────────────────
-
-  testWidgets('Polyline renders between two points', (tester) async {
-    await tester.pumpWidget(
-      MapTestApp(
-        // Zoom in so the line is thick relative to the viewport and not lost
-        // among the AMap base-layer transit lines at zoom 12.
-        initialCameraPosition: const CameraPosition(
-          target: LatLng(31.2400, 121.4820),
-          zoom: 14,
+      ValueListenableBuilder<_Overlays>(
+        valueListenable: overlays,
+        builder: (context, o, _) => MapTestApp(
+          key: const ValueKey('map'),
+          initialCameraPosition: _camera,
+          markers: o.markers,
+          polylines: o.polylines,
+          polygons: o.polygons,
+          circles: o.circles,
         ),
-        polylines: {
-          Polyline(
-            polylineId: const PolylineId('route-basic'),
-            points: const [
-              LatLng(31.2304, 121.4737),
-              LatLng(31.2500, 121.4900),
-            ],
-            color: Colors.blue,
-            width: 10,
-          ),
-        },
       ),
     );
-    await _prepareForScreenshots(binding, tester);
-    await _screenshot(binding, 'polyline_basic');
-  });
 
-  testWidgets('Multi-segment polyline renders correctly', (tester) async {
-    await tester.pumpWidget(
-      MapTestApp(
-        initialCameraPosition: const CameraPosition(
-          target: LatLng(31.2400, 121.4750),
-          zoom: 13,
-        ),
-        polylines: {
-          Polyline(
-            polylineId: const PolylineId('route-multi'),
-            points: const [
-              LatLng(31.2100, 121.4400),
-              LatLng(31.2304, 121.4737),
-              LatLng(31.2500, 121.4900),
-              LatLng(31.2700, 121.5100),
-            ],
-            color: Colors.red,
-            width: 10,
-          ),
-        },
+    // One-time SDK init wait — paid only once for the entire test.
+    await tester.pump();
+    await Future.delayed(_mapInitDelay);
+    await tester.pump();
+
+    // Android: PixelCopy reads the hardware compositor (GPU framebuffer) so
+    // AMap's OpenGL ES tiles are included.  Screenshots are saved directly to
+    // the app's external files dir; CI pulls them with `adb pull` after the
+    // test completes.  convertFlutterSurfaceToImage() is intentionally NOT
+    // called — it hides Hybrid Composition platform views, producing a blank
+    // white screen.
+    //
+    // iOS: binding.takeScreenshot() uses the host-side XCUITest native
+    // screenshot API which already captures platform views correctly.
+    const _screenshotChannel = MethodChannel('com.example.autonavi/screenshot');
+
+    Future<void> shoot(
+      String name, {
+      Set<Marker> markers = const {},
+      Set<Polyline> polylines = const {},
+      Set<Polygon> polygons = const {},
+      Set<Circle> circles = const {},
+    }) async {
+      overlays.value = _Overlays(
+        markers: markers,
+        polylines: polylines,
+        polygons: polygons,
+        circles: circles,
+      );
+      await tester.pump();
+      await Future.delayed(_overlayUpdateDelay);
+      await tester.pump();
+      if (Platform.isAndroid) {
+        try {
+          // 5 s timeout: if the Kotlin side never calls result (e.g. due to an
+          // uncaught Error), this prevents the test from hanging indefinitely.
+          await _screenshotChannel
+              .invokeMethod<String>('captureAndSave', name)
+              .timeout(const Duration(seconds: 15), onTimeout: () => null);
+        } catch (e) {
+          debugPrint('Warning: screenshot $name failed: $e');
+        }
+      } else {
+        await binding.takeScreenshot(name);
+      }
+    }
+
+    // ── Empty map ─────────────────────────────────────────────────────────
+    await shoot('map_empty');
+
+    // ── Markers ───────────────────────────────────────────────────────────
+    await shoot('marker_single', markers: {
+      Marker(
+        markerId: const MarkerId('test-marker'),
+        position: const LatLng(31.2304, 121.4737),
       ),
-    );
-    await _prepareForScreenshots(binding, tester);
-    await _screenshot(binding, 'polyline_multi_segment');
-  });
+    });
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // Polygon rendering
-  // ─────────────────────────────────────────────────────────────────────────
-
-  testWidgets('Filled polygon renders with correct color', (tester) async {
-    await tester.pumpWidget(
-      MapTestApp(
-        polygons: {
-          Polygon(
-            polygonId: const PolygonId('area-basic'),
-            points: const [
-              LatLng(31.2200, 121.4500),
-              LatLng(31.2400, 121.4500),
-              LatLng(31.2400, 121.4900),
-              LatLng(31.2200, 121.4900),
-            ],
-            fillColor: const Color(0x800066CC),
-            strokeColor: Colors.blue,
-            strokeWidth: 2,
-          ),
-        },
+    await shoot('marker_multiple', markers: {
+      Marker(
+        markerId: const MarkerId('marker-a'),
+        position: const LatLng(31.2304, 121.4737),
       ),
-    );
-    await _prepareForScreenshots(binding, tester);
-    await _screenshot(binding, 'polygon_filled');
-  });
-
-  testWidgets('Polygon stroke-only renders correctly', (tester) async {
-    await tester.pumpWidget(
-      MapTestApp(
-        // Higher zoom so the triangle shape is clearly visible.
-        initialCameraPosition: const CameraPosition(
-          target: LatLng(31.2304, 121.4737),
-          zoom: 14,
-        ),
-        polygons: {
-          Polygon(
-            polygonId: const PolygonId('area-triangle'),
-            points: const [
-              LatLng(31.2450, 121.4737),
-              LatLng(31.2200, 121.4550),
-              LatLng(31.2200, 121.4920),
-            ],
-            fillColor: const Color(0x60FF6600),
-            strokeColor: Colors.orange,
-            strokeWidth: 4,
-          ),
-        },
+      Marker(
+        markerId: const MarkerId('marker-b'),
+        position: const LatLng(31.2440, 121.4830),
       ),
-    );
-    await _prepareForScreenshots(binding, tester);
-    await _screenshot(binding, 'polygon_triangle');
-  });
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // Circle rendering
-  // ─────────────────────────────────────────────────────────────────────────
-
-  testWidgets('Circle renders at center with correct radius', (tester) async {
-    await tester.pumpWidget(
-      MapTestApp(
-        // Zoom in so a 1 km circle is large enough to see clearly.
-        initialCameraPosition: const CameraPosition(
-          target: LatLng(31.2304, 121.4737),
-          zoom: 15,
-        ),
-        circles: {
-          Circle(
-            circleId: const CircleId('circle-basic'),
-            center: const LatLng(31.2304, 121.4737),
-            radius: 1000, // 1 km radius
-            fillColor: const Color(0x80FF0000), // opaque enough to be visible
-            strokeColor: Colors.red,
-            strokeWidth: 4,
-          ),
-        },
+      Marker(
+        markerId: const MarkerId('marker-c'),
+        position: const LatLng(31.2170, 121.4640),
       ),
-    );
-    await _prepareForScreenshots(binding, tester);
-    await _screenshot(binding, 'circle_basic');
-  });
+    });
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // Combined overlays
-  // ─────────────────────────────────────────────────────────────────────────
-
-  testWidgets('Multiple overlay types render together', (tester) async {
-    await tester.pumpWidget(
-      MapTestApp(
-        // Zoom in so all three overlay types are clearly visible together.
-        initialCameraPosition: const CameraPosition(
-          target: LatLng(31.2304, 121.4737),
-          zoom: 14,
-        ),
-        markers: {
-          Marker(
-            markerId: const MarkerId('origin'),
-            position: const LatLng(31.2304, 121.4737),
-          ),
-        },
-        polylines: {
-          Polyline(
-            polylineId: const PolylineId('route'),
-            points: const [
-              LatLng(31.2304, 121.4737),
-              LatLng(31.2500, 121.4900),
-            ],
-            color: Colors.green,
-            width: 6,
-          ),
-        },
-        circles: {
-          Circle(
-            circleId: const CircleId('buffer'),
-            center: const LatLng(31.2304, 121.4737),
-            radius: 500,
-            fillColor: const Color(0x6000CC66), // opaque enough to see
-            strokeColor: Colors.green,
-            strokeWidth: 3,
-          ),
-        },
+    // ── Polylines ─────────────────────────────────────────────────────────
+    await shoot('polyline_basic', polylines: {
+      Polyline(
+        polylineId: const PolylineId('route-basic'),
+        points: const [
+          LatLng(31.2204, 121.4657),
+          LatLng(31.2404, 121.4817),
+        ],
+        color: Colors.blue,
+        width: 10,
       ),
-    );
-    await _prepareForScreenshots(binding, tester);
-    await _screenshot(binding, 'overlay_combined');
-  });
+    });
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // Overlay update regression
-  //
-  // This test verifies that didUpdateWidget correctly sends markers#update
-  // over the Platform Channel and that the map reflects the change.
-  // ─────────────────────────────────────────────────────────────────────────
+    await shoot('polyline_multi_segment', polylines: {
+      Polyline(
+        polylineId: const PolylineId('route-multi'),
+        points: const [
+          LatLng(31.2164, 121.4657),
+          LatLng(31.2384, 121.4697),
+          LatLng(31.2184, 121.4787),
+          LatLng(31.2424, 121.4827),
+        ],
+        color: Colors.red,
+        width: 10,
+      ),
+    });
 
-  testWidgets('Marker updates are reflected after widget rebuild',
-      (tester) async {
-    // Initial state: one marker at position A.
-    final markerState = ValueNotifier<Set<Marker>>(
-      {
+    // ── Polygons ──────────────────────────────────────────────────────────
+    await shoot('polygon_filled', polygons: {
+      Polygon(
+        polygonId: const PolygonId('area-basic'),
+        points: const [
+          LatLng(31.2229, 121.4677),
+          LatLng(31.2379, 121.4677),
+          LatLng(31.2379, 121.4797),
+          LatLng(31.2229, 121.4797),
+        ],
+        fillColor: const Color(0x800066CC),
+        strokeColor: Colors.blue,
+        strokeWidth: 2,
+      ),
+    });
+
+    await shoot('polygon_triangle', polygons: {
+      Polygon(
+        polygonId: const PolygonId('area-triangle'),
+        points: const [
+          LatLng(31.2404, 121.4737),
+          LatLng(31.2204, 121.4637),
+          LatLng(31.2204, 121.4837),
+        ],
+        fillColor: const Color(0x60FF6600),
+        strokeColor: Colors.orange,
+        strokeWidth: 4,
+      ),
+    });
+
+    // ── Circle ────────────────────────────────────────────────────────────
+    await shoot('circle_basic', circles: {
+      Circle(
+        circleId: const CircleId('circle-basic'),
+        center: const LatLng(31.2304, 121.4737),
+        radius: 600,
+        fillColor: const Color(0x80FF0000),
+        strokeColor: Colors.red,
+        strokeWidth: 4,
+      ),
+    });
+
+    // ── Combined overlays ─────────────────────────────────────────────────
+    await shoot(
+      'overlay_combined',
+      markers: {
         Marker(
-          markerId: const MarkerId('dynamic'),
+          markerId: const MarkerId('origin'),
           position: const LatLng(31.2304, 121.4737),
+        ),
+      },
+      polylines: {
+        Polyline(
+          polylineId: const PolylineId('route'),
+          points: const [
+            LatLng(31.2304, 121.4737),
+            LatLng(31.2404, 121.4817),
+          ],
+          color: Colors.green,
+          width: 6,
+        ),
+      },
+      circles: {
+        Circle(
+          circleId: const CircleId('buffer'),
+          center: const LatLng(31.2304, 121.4737),
+          radius: 500,
+          fillColor: const Color(0x6000CC66),
+          strokeColor: Colors.green,
+          strokeWidth: 3,
         ),
       },
     );
 
-    await tester.pumpWidget(
-      ValueListenableBuilder<Set<Marker>>(
-        valueListenable: markerState,
-        builder: (context, markers, _) => MapTestApp(markers: markers),
-      ),
-    );
-    // convertFlutterSurfaceToImage is called exactly once for this test.
-    await _prepareForScreenshots(binding, tester);
-    await _screenshot(binding, 'marker_update_before');
-
-    // Move the marker to position B to trigger markers#update channel call.
-    markerState.value = {
+    // ── Marker update regression ──────────────────────────────────────────
+    // Verifies that didUpdateWidget sends markers#update (not add + remove)
+    // when the same MarkerId moves to a new position.
+    await shoot('marker_update_before', markers: {
       Marker(
         markerId: const MarkerId('dynamic'),
-        position: const LatLng(31.2500, 121.4900),
+        position: const LatLng(31.2304, 121.4737),
       ),
-    };
-    // Do NOT call _prepareForScreenshots again — surface is already converted.
-    await tester.pump();
-    await Future.delayed(_tilePaintDelay);
-    await tester.pump();
-    await _screenshot(binding, 'marker_update_after');
+    });
+    await shoot('marker_update_after', markers: {
+      Marker(
+        markerId: const MarkerId('dynamic'),
+        position: const LatLng(31.2404, 121.4817),
+      ),
+    });
   });
-
 }

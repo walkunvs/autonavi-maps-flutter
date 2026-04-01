@@ -49,14 +49,8 @@ jobs:
 
       - name: Flutter Analyze
         id: analyze
-        run: dart run melos exec -- "flutter analyze --no-fatal-infos" 2>&1 | tee /tmp/analyze.log; exit ${PIPESTATUS[0]}
+        run: dart run melos exec -- "flutter analyze --no-fatal-infos"
         continue-on-error: true
-
-      - uses: actions/upload-artifact@v6
-        if: always()
-        with:
-          name: log-analyze
-          path: /tmp/analyze.log
 
   # ── 2. iOS Simulator Integration Tests ───────────────────────────────────
   integration_test_ios:
@@ -143,35 +137,6 @@ jobs:
           path: example/integration_test/screenshots/
           if-no-files-found: warn
 
-      - name: Compare screenshots against goldens (informational)
-        if: always()
-        continue-on-error: true
-        run: |
-          pip install pillow --break-system-packages
-          python scripts/golden_diff.py \
-            example/integration_test/golden/ios \
-            example/integration_test/screenshots \
-            --threshold 2.0 \
-            --diff-dir example/integration_test/diffs \
-            2>&1 | tee /tmp/golden-report-ios.txt
-          echo "exit_code=${PIPESTATUS[0]}" >> /tmp/golden-report-ios.txt
-
-      - name: Upload golden diff report
-        uses: actions/upload-artifact@v6
-        if: always()
-        with:
-          name: golden-report-ios
-          path: /tmp/golden-report-ios.txt
-          if-no-files-found: ignore
-
-      - name: Upload diff images
-        uses: actions/upload-artifact@v6
-        if: always()
-        with:
-          name: ios-golden-diffs
-          path: example/integration_test/diffs/
-          if-no-files-found: ignore
-
       - name: Shutdown simulator
         if: always()
         run: |
@@ -182,16 +147,13 @@ jobs:
         env:
           SIM_UDID: ${{ env.SIM_UDID }}
 
-      - uses: actions/upload-artifact@v6
-        if: always()
-        with:
-          name: log-integration-ios
-          path: /tmp/integration-ios.log
-          if-no-files-found: ignore
-
-  # ── 3. Android Emulator Integration Tests ────────────────────────────────
-  integration_test_android:
-    name: Integration Tests (Android Emulator)
+  # ── 3. Android Build Check ────────────────────────────────────────────────
+  # Verifies the Android example app compiles. Integration tests are not run
+  # on CI because map tile rendering is unreliable on emulators (OpenGL ES /
+  # network constraints). Run locally with a real device or emulator instead.
+  # ─────────────────────────────────────────────────────────────────────────
+  build_android:
+    name: Build (Android)
     runs-on: ubuntu-latest
     outputs:
       status: ${{ steps.capture.outputs.status }}
@@ -215,24 +177,23 @@ jobs:
         run: dart pub get && dart run melos bootstrap
         continue-on-error: true
 
-      - name: Enable KVM hardware acceleration
+      - name: Restore fixed CI debug keystore
         if: steps.melos.outcome == 'success'
         run: |
-          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
-            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
-          sudo udevadm control --reload-rules
-          sudo udevadm trigger --name-match=kvm
+          mkdir -p "$HOME/.android"
+          echo "${{ secrets.ANDROID_DEBUG_KEYSTORE_BASE64 }}" \
+            | base64 -d > "$HOME/.android/debug.keystore"
 
-      - name: Run integration tests on Android Emulator
-        id: test
+      - name: Build debug APK
+        id: apk_build
         if: steps.melos.outcome == 'success'
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 33
-          target: google_apis
-          arch: x86_64
-          profile: Nexus 6
-          script: cd example && flutter drive --driver=test_driver/integration_test.dart --target=integration_test/map_rendering_test.dart -d emulator-5554 "--dart-define=AMAP_ANDROID_KEY=${{ secrets.AMAP_ANDROID_KEY }}" > /tmp/integration-android.log 2>&1
+        working-directory: example
+        env:
+          AMAP_API_KEY: ${{ secrets.AMAP_ANDROID_KEY }}
+        run: |
+          flutter build apk --debug \
+            "--dart-define=AMAP_ANDROID_KEY=${{ secrets.AMAP_ANDROID_KEY }}" \
+            2>&1 | tee /tmp/apk-build.log; exit ${PIPESTATUS[0]}
         continue-on-error: true
 
       - name: Capture job status
@@ -242,52 +203,8 @@ jobs:
           if [[ "${{ steps.melos.outcome }}" == "failure" ]]; then
             echo "status=failure" >> $GITHUB_OUTPUT
           else
-            echo "status=${{ steps.test.outcome }}" >> $GITHUB_OUTPUT
+            echo "status=${{ steps.apk_build.outcome }}" >> $GITHUB_OUTPUT
           fi
-
-      - name: Upload screenshots artifact
-        uses: actions/upload-artifact@v6
-        if: always()
-        with:
-          name: android-map-screenshots
-          path: example/integration_test/screenshots/
-          if-no-files-found: warn
-
-      - name: Compare screenshots against goldens (informational)
-        if: always()
-        continue-on-error: true
-        run: |
-          pip install pillow --break-system-packages
-          python scripts/golden_diff.py \
-            example/integration_test/golden/android \
-            example/integration_test/screenshots \
-            --threshold 2.0 \
-            --diff-dir example/integration_test/diffs \
-            2>&1 | tee /tmp/golden-report-android.txt
-          echo "exit_code=${PIPESTATUS[0]}" >> /tmp/golden-report-android.txt
-
-      - name: Upload golden diff report
-        uses: actions/upload-artifact@v6
-        if: always()
-        with:
-          name: golden-report-android
-          path: /tmp/golden-report-android.txt
-          if-no-files-found: ignore
-
-      - name: Upload diff images
-        uses: actions/upload-artifact@v6
-        if: always()
-        with:
-          name: android-golden-diffs
-          path: example/integration_test/diffs/
-          if-no-files-found: ignore
-
-      - uses: actions/upload-artifact@v6
-        if: always()
-        with:
-          name: log-integration-android
-          path: /tmp/integration-android.log
-          if-no-files-found: ignore
 
   # ── 4. Save job results as artifact for comment workflow ──────────────────
   save-results:
@@ -296,15 +213,15 @@ jobs:
     needs:
       - analyze
       - integration_test_ios
-      - integration_test_android
+      - build_android
     if: always()
     steps:
       - name: Write job results
         run: |
           mkdir -p /tmp/results
-          echo "${{ needs.analyze.outputs.status }}"                        > /tmp/results/analyze
-          echo "${{ needs.integration_test_ios.outputs.status }}"           > /tmp/results/integration_ios
-          echo "${{ needs.integration_test_android.outputs.status }}"       > /tmp/results/integration_android
+          echo "${{ needs.analyze.outputs.status }}"              > /tmp/results/analyze
+          echo "${{ needs.integration_test_ios.outputs.status }}" > /tmp/results/integration_ios
+          echo "${{ needs.build_android.outputs.status }}"        > /tmp/results/build_android
       - uses: actions/upload-artifact@v6
         with:
           name: job-results

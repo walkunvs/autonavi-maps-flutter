@@ -78,11 +78,14 @@ jobs:
           SIM_UDID: ${{ env.SIM_UDID }}
 
   # ───────────────────────────────────────────────────────────────────────────
-  # Android Emulator integration tests
+  # Android build check
+  # Verifies the Android example app compiles. Integration tests are not run
+  # on CI because map tile rendering is unreliable on emulators (OpenGL ES /
+  # network constraints). Run locally with a real device or emulator instead.
   # ───────────────────────────────────────────────────────────────────────────
-  integration_test_android:
-    name: Integration Tests (Android Emulator)
-    runs-on: macos-14
+  build_android:
+    name: Build (Android)
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
 
@@ -100,37 +103,34 @@ jobs:
       - name: Install Melos
         run: dart pub get && dart run melos bootstrap
 
-      - name: Run integration tests on Android Emulator
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 33
-          target: google_apis
-          arch: arm64-v8a
-          profile: Nexus 6
-          script: cd example && flutter drive --driver=test_driver/integration_test.dart --target=integration_test/map_rendering_test.dart -d emulator-5554 "--dart-define=AMAP_ANDROID_KEY=${{ secrets.AMAP_ANDROID_KEY }}"
+      - name: Restore fixed CI debug keystore
+        run: |
+          mkdir -p "$HOME/.android"
+          echo "${{ secrets.ANDROID_DEBUG_KEYSTORE_BASE64 }}" \
+            | base64 -d > "$HOME/.android/debug.keystore"
 
-      - name: Upload screenshots artifact
-        uses: actions/upload-artifact@v6
-        if: always()
-        with:
-          name: android-map-screenshots
-          path: example/integration_test/screenshots/
-          if-no-files-found: warn
+      - name: Build debug APK
+        working-directory: example
+        env:
+          AMAP_API_KEY: ${{ secrets.AMAP_ANDROID_KEY }}
+        run: |
+          flutter build apk --debug \
+            "--dart-define=AMAP_ANDROID_KEY=${{ secrets.AMAP_ANDROID_KEY }}"
 
   # ───────────────────────────────────────────────────────────────────────────
-  # Update golden baselines
+  # Update golden baselines (iOS only)
   #
-  # Runs after both integration test jobs complete.  Always overwrites the
-  # committed goldens with the screenshots from this run so that golden/
-  # always reflects the latest state of main.
+  # Runs after iOS integration tests complete. Opens a PR to overwrite the
+  # committed goldens with the screenshots from this run.
   # ───────────────────────────────────────────────────────────────────────────
   update_goldens:
     name: Update Golden Baselines
     runs-on: ubuntu-latest
-    needs: [integration_test_ios, integration_test_android]
+    needs: [integration_test_ios]
     if: always()
     permissions:
       contents: write
+      pull-requests: write
     steps:
       - uses: actions/checkout@v5
         with:
@@ -143,34 +143,28 @@ jobs:
           path: /tmp/ios-screenshots/
         continue-on-error: true
 
-      - name: Download Android screenshots
-        uses: actions/download-artifact@v4
-        with:
-          name: android-map-screenshots
-          path: /tmp/android-screenshots/
-        continue-on-error: true
-
-      - name: Overwrite goldens and commit
+      - name: Overwrite goldens
         run: |
-          CHANGED=false
-
           if ls /tmp/ios-screenshots/*.png 2>/dev/null | head -1 > /dev/null; then
             cp /tmp/ios-screenshots/*.png example/integration_test/golden/ios/
             echo "Updated $(ls /tmp/ios-screenshots/*.png | wc -l | tr -d ' ') iOS goldens."
-            CHANGED=true
-          fi
-
-          if ls /tmp/android-screenshots/*.png 2>/dev/null | head -1 > /dev/null; then
-            cp /tmp/android-screenshots/*.png example/integration_test/golden/android/
-            echo "Updated $(ls /tmp/android-screenshots/*.png | wc -l | tr -d ' ') Android goldens."
-            CHANGED=true
-          fi
-
-          if [ "$CHANGED" = "true" ]; then
-            git config user.name "github-actions[bot]"
-            git config user.email "github-actions[bot]@users.noreply.github.com"
-            git add example/integration_test/golden/
-            git diff --cached --quiet || git commit -m "ci: update golden baselines [skip ci]" && git push
+            echo "CHANGED=true" >> "$GITHUB_ENV"
           else
-            echo "No screenshots produced — goldens unchanged."
+            echo "No iOS screenshots produced — goldens unchanged."
+            echo "CHANGED=false" >> "$GITHUB_ENV"
           fi
+
+      - name: Open PR with updated goldens
+        if: env.CHANGED == 'true'
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "ci: update golden baselines [skip ci]"
+          branch: ci/golden-baselines
+          delete-branch: true
+          title: "ci: update golden baselines"
+          body: |
+            Automated update of iOS golden baseline screenshots from the latest CI run.
+
+            Triggered by: ${{ github.sha }} (`${{ github.ref_name }}`)
+          labels: automated,ci
