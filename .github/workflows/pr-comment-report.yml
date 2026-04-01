@@ -52,42 +52,9 @@ jobs:
             body += `| Integration Tests (iOS Simulator) | ${icon(results.integration_ios)} ${results.integration_ios} |\n`;
             body += `| Build (Android)                   | ${icon(results.build_android)}   ${results.build_android} |\n\n`;
 
-            // Append error logs for failed jobs
-            const failedJobs = [
-              { label: 'Flutter Analyze',           status: results.analyze,         logFile: '/tmp/artifacts/log-analyze/analyze.log' },
-              { label: 'Integration Tests (iOS)',    status: results.integration_ios, logFile: '/tmp/artifacts/log-integration-ios/integration-ios.log' },
-              { label: 'Build (Android)',            status: results.build_android,   logFile: '/tmp/artifacts/log-apk-build/apk-build.log' },
-            ].filter(j => j.status === 'failure');
-
-            if (failedJobs.length > 0) {
-              body += `---\n### Error Details\n\n`;
-              for (const j of failedJobs) {
-                body += `<details>\n<summary>❌ ${j.label} — last 100 lines</summary>\n\n\`\`\`\n`;
-                try {
-                  const lines = fs.readFileSync(j.logFile, 'utf8').split('\n');
-                  body += lines.slice(-100).join('\n');
-                } catch {
-                  body += '(log not available)';
-                }
-                body += `\n\`\`\`\n</details>\n\n`;
-              }
-            } else {
+            const anyFailure = Object.values(results).some(s => s === 'failure');
+            if (!anyFailure) {
               body += `> ✅ All checks passed!\n\n`;
-            }
-
-            // Golden screenshot diff report (iOS only)
-            let reportText = '';
-            try { reportText = fs.readFileSync('/tmp/artifacts/golden-report-ios/golden-report-ios.txt', 'utf8').trim(); } catch {}
-            if (reportText) {
-              const lines = reportText.split('\n');
-              const exitLine = lines.find(l => l.startsWith('exit_code='));
-              const exitCode = exitLine ? parseInt(exitLine.split('=')[1]) : 0;
-              const reportBody = lines.filter(l => !l.startsWith('exit_code=')).join('\n').trim();
-              const statusIcon = exitCode === 0 ? '✅' : '⚠️';
-              body += `---\n### Screenshot Comparison _(informational — does not block merge)_\n\n`;
-              body += `<details>\n<summary>${statusIcon} Screenshot diff — iOS</summary>\n\n\`\`\`\n${reportBody}\n\`\`\`\n`;
-              if (exitCode !== 0) body += `\n[View diff images](${runUrl})\n`;
-              body += `</details>\n\n`;
             }
 
             // Link to screenshots artifact
