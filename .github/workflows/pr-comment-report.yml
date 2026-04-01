@@ -37,9 +37,9 @@ jobs:
             // Read job results
             const read = (p) => { try { return fs.readFileSync(p, 'utf8').trim(); } catch { return 'skipped'; } };
             const results = {
-              analyze:             read('/tmp/artifacts/job-results/analyze'),
-              integration_ios:     read('/tmp/artifacts/job-results/integration_ios'),
-              integration_android: read('/tmp/artifacts/job-results/integration_android'),
+              analyze:         read('/tmp/artifacts/job-results/analyze'),
+              integration_ios: read('/tmp/artifacts/job-results/integration_ios'),
+              build_android:   read('/tmp/artifacts/job-results/build_android'),
             };
 
             const icon = s => s === 'success' ? '✅' : s === 'failure' ? '❌' : s === 'skipped' ? '⏭️' : '⚠️';
@@ -48,15 +48,15 @@ jobs:
             // Build comment body
             let body = `<!-- ci-build-report -->\n## CI Build Report\n\n`;
             body += `| Job | Status |\n|-----|--------|\n`;
-            body += `| Flutter Analyze                     | ${icon(results.analyze)}             ${results.analyze} |\n`;
-            body += `| Integration Tests (iOS Simulator)   | ${icon(results.integration_ios)}     ${results.integration_ios} |\n`;
-            body += `| Integration Tests (Android Emulator)| ${icon(results.integration_android)} ${results.integration_android} |\n\n`;
+            body += `| Flutter Analyze                   | ${icon(results.analyze)}         ${results.analyze} |\n`;
+            body += `| Integration Tests (iOS Simulator) | ${icon(results.integration_ios)} ${results.integration_ios} |\n`;
+            body += `| Build (Android)                   | ${icon(results.build_android)}   ${results.build_android} |\n\n`;
 
             // Append error logs for failed jobs
             const failedJobs = [
-              { label: 'Flutter Analyze',             status: results.analyze,             logFile: '/tmp/artifacts/log-analyze/analyze.log' },
-              { label: 'Integration Tests (iOS)',      status: results.integration_ios,     logFile: '/tmp/artifacts/log-integration-ios/integration-ios.log' },
-              { label: 'Integration Tests (Android)',  status: results.integration_android, logFile: '/tmp/artifacts/log-integration-android/integration-android.log' },
+              { label: 'Flutter Analyze',           status: results.analyze,         logFile: '/tmp/artifacts/log-analyze/analyze.log' },
+              { label: 'Integration Tests (iOS)',    status: results.integration_ios, logFile: '/tmp/artifacts/log-integration-ios/integration-ios.log' },
+              { label: 'Build (Android)',            status: results.build_android,   logFile: '/tmp/artifacts/log-apk-build/apk-build.log' },
             ].filter(j => j.status === 'failure');
 
             if (failedJobs.length > 0) {
@@ -75,38 +75,24 @@ jobs:
               body += `> ✅ All checks passed!\n\n`;
             }
 
-            // Golden screenshot diff reports (informational, never blocks the PR)
-            const goldenReports = [
-              { label: 'iOS',     file: '/tmp/artifacts/golden-report-ios/golden-report-ios.txt' },
-              { label: 'Android', file: '/tmp/artifacts/golden-report-android/golden-report-android.txt' },
-            ];
-            const goldenSections = [];
-            for (const r of goldenReports) {
-              let reportText = '';
-              try { reportText = fs.readFileSync(r.file, 'utf8').trim(); } catch { continue; }
-              if (!reportText) continue;
+            // Golden screenshot diff report (iOS only)
+            let reportText = '';
+            try { reportText = fs.readFileSync('/tmp/artifacts/golden-report-ios/golden-report-ios.txt', 'utf8').trim(); } catch {}
+            if (reportText) {
               const lines = reportText.split('\n');
               const exitLine = lines.find(l => l.startsWith('exit_code='));
               const exitCode = exitLine ? parseInt(exitLine.split('=')[1]) : 0;
               const reportBody = lines.filter(l => !l.startsWith('exit_code=')).join('\n').trim();
               const statusIcon = exitCode === 0 ? '✅' : '⚠️';
-              goldenSections.push(
-                `<details>\n<summary>${statusIcon} Screenshot diff — ${r.label}</summary>\n\n\`\`\`\n${reportBody}\n\`\`\`\n` +
-                (exitCode !== 0 ? `\n[View diff images](${runUrl})\n` : '') +
-                `</details>`
-              );
-            }
-            if (goldenSections.length > 0) {
               body += `---\n### Screenshot Comparison _(informational — does not block merge)_\n\n`;
-              body += goldenSections.join('\n\n') + '\n\n';
+              body += `<details>\n<summary>${statusIcon} Screenshot diff — iOS</summary>\n\n\`\`\`\n${reportBody}\n\`\`\`\n`;
+              if (exitCode !== 0) body += `\n[View diff images](${runUrl})\n`;
+              body += `</details>\n\n`;
             }
 
-            // Link to screenshots artifacts
+            // Link to screenshots artifact
             if (results.integration_ios !== 'skipped') {
-              body += `📸 [iOS screenshots](${runUrl})  `;
-            }
-            if (results.integration_android !== 'skipped') {
-              body += `📸 [Android screenshots](${runUrl})\n`;
+              body += `📸 [iOS screenshots](${runUrl})\n`;
             }
             body += `\n**Commit:** ${headSha.slice(0, 7)} | **Run:** [${context.payload.workflow_run.id}](${runUrl})`;
 

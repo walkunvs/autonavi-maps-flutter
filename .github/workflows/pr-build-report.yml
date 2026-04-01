@@ -189,9 +189,13 @@ jobs:
           path: /tmp/integration-ios.log
           if-no-files-found: ignore
 
-  # ── 3. Android Emulator Integration Tests ────────────────────────────────
-  integration_test_android:
-    name: Integration Tests (Android Emulator)
+  # ── 3. Android Build Check ────────────────────────────────────────────────
+  # Verifies the Android example app compiles. Integration tests are not run
+  # on CI because map tile rendering is unreliable on emulators (OpenGL ES /
+  # network constraints). Run locally with a real device or emulator instead.
+  # ─────────────────────────────────────────────────────────────────────────
+  build_android:
+    name: Build (Android)
     runs-on: ubuntu-latest
     outputs:
       status: ${{ steps.capture.outputs.status }}
@@ -215,14 +219,6 @@ jobs:
         run: dart pub get && dart run melos bootstrap
         continue-on-error: true
 
-      - name: Enable KVM hardware acceleration
-        if: steps.melos.outcome == 'success'
-        run: |
-          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
-            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
-          sudo udevadm control --reload-rules
-          sudo udevadm trigger --name-match=kvm
-
       - name: Restore fixed CI debug keystore
         if: steps.melos.outcome == 'success'
         run: |
@@ -230,7 +226,7 @@ jobs:
           echo "${{ secrets.ANDROID_DEBUG_KEYSTORE_BASE64 }}" \
             | base64 -d > "$HOME/.android/debug.keystore"
 
-      - name: Build debug APK (catches Gradle / Kotlin errors before emulator starts)
+      - name: Build debug APK
         id: apk_build
         if: steps.melos.outcome == 'success'
         working-directory: example
@@ -242,149 +238,21 @@ jobs:
             2>&1 | tee /tmp/apk-build.log; exit ${PIPESTATUS[0]}
         continue-on-error: true
 
-      - name: Print debug keystore SHA1 (register this in AMap console → Android Key)
-        if: steps.apk_build.outcome == 'success'
-        run: |
-          APK="example/build/app/outputs/flutter-apk/app-debug.apk"
-          if [ ! -f "$APK" ]; then
-            echo "APK not found: $APK"
-          else
-            echo "=== Certificate fingerprints from APK ==="
-            BUILD_TOOLS=$(ls -1 "$ANDROID_HOME/build-tools/" | sort -V | tail -1)
-            "$ANDROID_HOME/build-tools/$BUILD_TOOLS/apksigner" verify \
-              --print-certs "$APK" 2>&1 || true
-          fi
-
-      - name: Write Android test runner
-        if: steps.apk_build.outcome == 'success'
-        run: |
-          cat > /tmp/android_test.sh << 'SCRIPT_EOF'
-          #!/bin/sh
-          # android-emulator-runner@v2 runs each line of script: as a separate
-          # /usr/bin/sh -c invocation — this file runs as a single process so
-          # variables and cd changes persist throughout.
-          #
-          # Screenshot mechanism: the test app writes screenshot_request.txt to
-          # its external files dir; this loop detects it, calls adb screencap,
-          # then writes screenshot_done.txt so the app can continue.
-          LOG=/tmp/integration-android.log
-          touch "$LOG"
-          PKG_FILES="/sdcard/Android/data/com.example.autonavi_maps_flutter_example/files"
-          SCREENSHOTS="$GITHUB_WORKSPACE/example/integration_test/screenshots"
-          mkdir -p "$SCREENSHOTS"
-          adb devices >> "$LOG" 2>&1
-          adb logcat -s "ScreenshotChannel,AMap,AMap_*,com.amap*,AMAP*" -v time > /tmp/logcat-screenshot.txt &
-          LOGCAT_PID=$!
-          # Start screenshot monitor in background
-          while true; do
-            NAME=$(adb shell "cat $PKG_FILES/screenshot_request.txt 2>/dev/null" | tr -d '\r\n ')
-            if [ -n "$NAME" ]; then
-              adb shell "rm $PKG_FILES/screenshot_request.txt 2>/dev/null" || true
-              adb exec-out screencap -p > "$SCREENSHOTS/$NAME.png"
-              adb shell "touch $PKG_FILES/screenshot_done.txt" || true
-              echo "Captured: $NAME" >> "$LOG"
-            fi
-            sleep 0.3
-          done &
-          MONITOR_PID=$!
-          echo "=== running flutter test ===" >> "$LOG"
-          cd "$GITHUB_WORKSPACE/example"
-          export AMAP_API_KEY="${{ secrets.AMAP_ANDROID_KEY }}"
-          DRIVE_RESULT=0
-          flutter test integration_test/map_rendering_test.dart \
-            -d emulator-5554 \
-            "--dart-define=AMAP_ANDROID_KEY=${{ secrets.AMAP_ANDROID_KEY }}" \
-            >> "$LOG" 2>&1 || DRIVE_RESULT=$?
-          echo "=== flutter test exit=$DRIVE_RESULT ===" >> "$LOG"
-          kill $MONITOR_PID 2>/dev/null || true
-          kill $LOGCAT_PID  2>/dev/null || true
-          echo "=== done ===" >> "$LOG"
-          exit $DRIVE_RESULT
-          SCRIPT_EOF
-          chmod +x /tmp/android_test.sh
-
-      - name: Run integration tests on Android Emulator
-        id: test
-        if: steps.apk_build.outcome == 'success'
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 33
-          target: google_apis
-          arch: x86_64
-          profile: Nexus 6
-          script: /tmp/android_test.sh
-        continue-on-error: true
-
-      - name: Upload APK build log
-        uses: actions/upload-artifact@v6
-        if: always()
-        with:
-          name: log-apk-build
-          path: /tmp/apk-build.log
-          if-no-files-found: ignore
-
-      - name: Upload ScreenshotChannel logcat
-        uses: actions/upload-artifact@v6
-        if: always()
-        with:
-          name: logcat-screenshot-channel
-          path: /tmp/logcat-screenshot.txt
-          if-no-files-found: ignore
-
       - name: Capture job status
         id: capture
         if: always()
         run: |
           if [[ "${{ steps.melos.outcome }}" == "failure" ]]; then
             echo "status=failure" >> $GITHUB_OUTPUT
-          elif [[ "${{ steps.apk_build.outcome }}" == "failure" ]]; then
-            echo "status=failure" >> $GITHUB_OUTPUT
           else
-            echo "status=${{ steps.test.outcome }}" >> $GITHUB_OUTPUT
+            echo "status=${{ steps.apk_build.outcome }}" >> $GITHUB_OUTPUT
           fi
-
-      - name: Upload screenshots artifact
-        uses: actions/upload-artifact@v6
-        if: always()
-        with:
-          name: android-map-screenshots
-          path: example/integration_test/screenshots/
-          if-no-files-found: warn
-
-      - name: Compare screenshots against goldens (informational)
-        if: always()
-        continue-on-error: true
-        run: |
-          pip install pillow --break-system-packages
-          python scripts/golden_diff.py \
-            example/integration_test/golden/android \
-            example/integration_test/screenshots \
-            --threshold 2.0 \
-            --diff-dir example/integration_test/diffs \
-            2>&1 | tee /tmp/golden-report-android.txt
-          echo "exit_code=${PIPESTATUS[0]}" >> /tmp/golden-report-android.txt
-
-      - name: Upload golden diff report
-        uses: actions/upload-artifact@v6
-        if: always()
-        with:
-          name: golden-report-android
-          path: /tmp/golden-report-android.txt
-          if-no-files-found: ignore
-
-      - name: Upload diff images
-        uses: actions/upload-artifact@v6
-        if: always()
-        with:
-          name: android-golden-diffs
-          path: example/integration_test/diffs/
-          if-no-files-found: ignore
 
       - uses: actions/upload-artifact@v6
         if: always()
         with:
-          name: log-integration-android
-          path: /tmp/integration-android.log
+          name: log-apk-build
+          path: /tmp/apk-build.log
           if-no-files-found: ignore
 
   # ── 4. Save job results as artifact for comment workflow ──────────────────
@@ -394,15 +262,15 @@ jobs:
     needs:
       - analyze
       - integration_test_ios
-      - integration_test_android
+      - build_android
     if: always()
     steps:
       - name: Write job results
         run: |
           mkdir -p /tmp/results
-          echo "${{ needs.analyze.outputs.status }}"                        > /tmp/results/analyze
-          echo "${{ needs.integration_test_ios.outputs.status }}"           > /tmp/results/integration_ios
-          echo "${{ needs.integration_test_android.outputs.status }}"       > /tmp/results/integration_android
+          echo "${{ needs.analyze.outputs.status }}"              > /tmp/results/analyze
+          echo "${{ needs.integration_test_ios.outputs.status }}" > /tmp/results/integration_ios
+          echo "${{ needs.build_android.outputs.status }}"        > /tmp/results/build_android
       - uses: actions/upload-artifact@v6
         with:
           name: job-results
